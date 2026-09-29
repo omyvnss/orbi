@@ -45,8 +45,9 @@ Free and open source. Needs macOS 13 or newer on an Apple Silicon Mac.
 **1 · Download for Mac.** Grab `Orbi.dmg` from the
 [latest release](https://github.com/omyvnss/orbi/releases/latest) or the
 [website](https://orbi-xi-jet.vercel.app), drag **Orbi** into Applications and
-open it. The build isn't notarized by Apple yet, so the first time, right-click
-Orbi and choose **Open**.
+open it. The build isn't notarized by Apple yet, so the first time macOS will
+stop it: open **System Settings → Privacy & Security** and click **Open Anyway**
+(or use the command below, which skips this).
 
 **2 · Install with one command.** It checks the download against its SHA-256,
 installs Orbi and opens it — no security prompt:
