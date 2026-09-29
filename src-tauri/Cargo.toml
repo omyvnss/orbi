@@ -1,0 +1,43 @@
+[package]
+name = "orbi"
+version = "0.1.0"
+description = "Orbi — a face for any AI agent"
+license = "MIT"
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "orbi_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# `image-png` lets the tray template icon be `include_bytes!`d into the binary.
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+# Server authenticity proof (docs/APP.md): HMAC-SHA256 over hook nonces.
+hmac = "0.12"
+sha2 = "0.10"
+tauri-plugin-autostart = "2"
+tauri-plugin-single-instance = "2"
+# BYOK explanations: blocking HTTPS client (rustls), no async runtime.
+ureq = { version = "2", default-features = false, features = ["tls"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSWindow", "NSResponder", "NSApplication", "NSWorkspace", "NSRunningApplication", "NSScreen", "libc"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
+# Global cursor position for the gaze / click-through loop.
+objc2-core-graphics = "0.3.2"
+# BYOK API keys in the Keychain via SecItem, so a key never appears in argv.
+security-framework = "3"
+
+# macOS 27's toolchain produces proc-macro dylibs dyld refuses to load
+# ("mis-aligned LINKEDIT string pool") when release builds strip them, so
+# build-time code is left unstripped. Does not affect the shipped binary.
+[profile.release.build-override]
+strip = false

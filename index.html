@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orbi</title>
+    <script>
+      // The widget window is transparent; the settings window is opaque. Paint
+      // it dark before the bundle loads so it never flashes white.
+      if (location.hash.startsWith("#settings")) {
+        document.documentElement.style.background = "#0d0d11";
+        document.title = "Orbi Settings";
+      }
+    </script>
+  </head>
+  <body style="background: transparent">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

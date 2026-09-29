@@ -1,0 +1,20 @@
+node_modules
+dist
+.playwright-mcp/
+.DS_Store
+dist-mac/
+site/public/Orbi.dmg
+site/public/Orbi.dmg.sha256
+site/public/install.sh
+
+# private notes for coding agents — never published
+CLAUDE.md
+AGENTS.md
+# the old Vite landing page (replaced by web/)
+site/
+# Vercel link + generated release binary (the .dmg ships in GitHub Releases)
+web/.vercel/
+web/.env*
+web/Orbi.dmg
+hook/target/
+src-tauri/target/

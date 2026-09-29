@@ -1,0 +1,60 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Orbi",
+  "version": "0.1.0",
+  "identifier": "dev.orbi.app",
+  "build": {
+    "beforeDevCommand": "sh scripts/build-hook.sh && pnpm exec vite",
+    "beforeBuildCommand": "sh scripts/build-hook.sh --release && pnpm run build",
+    "devUrl": "http://localhost:4179",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "widget",
+        "url": "index.html#widget",
+        "title": "Orbi",
+        "width": 240,
+        "height": 100,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": true,
+        "focus": false,
+        "center": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "externalBin": [
+      "binaries/orbi-hook"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "A face for your AI agents",
+    "copyright": "MIT License",
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "signingIdentity": "-"
+    }
+  }
+}

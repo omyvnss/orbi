@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbi — Give your agent a face.</title>
+<meta name="description" content="A little face at the top of your Mac that tells you what your AI agent wants to do — and lets you say yes or no with one key.">
+<meta name="theme-color" content="#d3d4c2">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Orbi">
+<meta property="og:title" content="Orbi — Give your agent a face.">
+<meta property="og:description" content="A little face at the top of your Mac that tells you what your AI agent wants to do — and lets you say yes or no with one key.">
+<meta property="og:url" content="https://orbi-xi-jet.vercel.app/">
+<meta property="og:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Orbi — Give your agent a face.">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Orbi — Give your agent a face.">
+<meta name="twitter:description" content="A little face at the top of your Mac that tells you what your AI agent wants to do — and lets you say yes or no with one key.">
+<meta name="twitter:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<script>document.documentElement.classList.add("js");setTimeout(function(){document.documentElement.classList.add("rise-done")},2500)</script>
+<link rel="stylesheet" href="styles.css?v=19">
+</head>
+<body>
+
+<!-- the nav: a small dark island at the top, like Orbi itself -->
+<nav class="bar" aria-label="Orbi">
+  <a class="bar__brand" href="#top" aria-label="Orbi, back to top">
+    <svg viewBox="60 290 904 440" width="30" height="15" aria-hidden="true">
+      <defs><linearGradient id="bar-ring" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e2ad55"/><stop offset=".6" stop-color="#efc57a"/><stop offset="1" stop-color="#f6e2b8"/></linearGradient></defs>
+      <g transform="translate(512 512) rotate(-14)"><path d="M -440 0 A 440 138 0 0 1 440 0" fill="none" stroke="url(#bar-ring)" stroke-width="30" stroke-linecap="round" opacity=".6"/></g>
+      <rect x="142" y="336" width="740" height="352" rx="176" fill="#ecebe4"/>
+      <circle cx="382" cy="500" r="66" fill="#0b0b0c"/><circle cx="642" cy="500" r="66" fill="#0b0b0c"/>
+      <g transform="translate(512 512) rotate(-14)"><path d="M 440 0 A 440 138 0 0 1 -440 0" fill="none" stroke="url(#bar-ring)" stroke-width="30" stroke-linecap="round"/><circle cx="286" cy="104" r="42" fill="#f6e2b8"/></g>
+    </svg>
+    <span>Orbi</span>
+  </a>
+  <a class="bar__btn bar__btn--main" href="Orbi.dmg" download>Download</a>
+</nav>
+
+<!-- ============================================================ HERO -->
+<header class="hero" id="top">
+  <p class="note note--a">open source · 2026</p>
+  <p class="note note--b">v0.1 · macOS</p>
+  <p class="note note--c">works with <b>Claude Code</b>, <b>Codex</b>, <b>OpenCode</b> +4</p>
+  <p class="note note--d">127.0.0.1 only · no cloud · no account</p>
+  <p class="note note--e"><b>0</b> auto-approvals, ever</p>
+  <p class="note note--f"><b>45s</b> → then your terminal asks</p>
+  <div class="caps" aria-hidden="true">
+    <span class="cap cap--1">⌃</span><span class="cap cap--2">⌥</span><span class="cap cap--3">A</span>
+  </div>
+
+  <div class="pitch">
+    <p class="pitch__eyebrow"><span></span>Open source · for macOS</p>
+    <h1 class="pitch__h">A face for every AI&nbsp;agent you&nbsp;run.</h1>
+    <div class="gets">
+      <a class="get get--main" href="Orbi.dmg" download><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 2v8m0 0 3.5-3.5M8 10 4.5 6.5M3 13h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>Download for Mac</a>
+      <button class="get" type="button" data-copy><b>Copy install command</b></button>
+    </div>
+    <p class="toast" role="status" aria-live="polite"></p>
+  </div>
+
+  <!-- the solar system: Orbi in the middle, your agents around it -->
+  <div class="sol" aria-label="Agents Orbi works with">
+    <div class="ring ring--1" style="--r:.25; --t:50s">
+      <span class="planet" style="--a:20deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/claude.svg" alt="" width="14" height="14"></b>Claude Code</span></span></span>
+      <span class="planet" style="--a:140deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/openai.svg" alt="" width="14" height="14"></b>Codex</span></span></span>
+      <span class="planet" style="--a:260deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/opencode.svg" alt="" width="14" height="14"></b>OpenCode</span></span></span>
+    </div>
+    <div class="ring ring--2" style="--r:.44; --t:90s">
+      <span class="planet" style="--a:60deg"><span class="planet__spin"><span class="planet__b"><b><img src="assets/logos/gemini.svg" alt="" width="14" height="14"></b>Gemini CLI</span></span></span>
+      <span class="planet" style="--a:150deg"><span class="planet__spin"><span class="planet__b"><b><img src="assets/logos/cursor.svg" alt="" width="14" height="14"></b>Cursor</span></span></span>
+      <span class="planet" style="--a:240deg"><span class="planet__spin"><span class="planet__b"><b class="is-photo"><img src="assets/logos/hermes.png" alt="" width="24" height="24"></b>Hermes</span></span></span>
+      <span class="planet" style="--a:330deg"><span class="planet__spin"><span class="planet__b"><b class="is-text">&gt;_</b>Any script</span></span></span>
+    </div>
+    <div class="sol__core">
+      <span class="island island--core is-working" data-core><i class="eye"></i><i class="eye"></i><b class="orbit"></b></span>
+      <p class="sol__name">Orbi</p>
+    </div>
+  </div>
+
+  <div class="capsule" data-capsule aria-hidden="true">
+    <span class="island island--cap"><i class="eye"></i><i class="eye"></i><b class="orbit"></b></span>
+    <span class="capsule__text" data-capsule-text>Claude Code is working…</span>
+  </div>
+
+</header>
+
+<!-- ============================================================ WHY -->
+<section class="band band--one" id="why">
+  <div class="card card--one">
+    <p class="card__tag">why orbi</p>
+    <h2 class="head">Seeing agents work while&nbsp;I&nbsp;do what moves&nbsp;me.</h2>
+    <p class="body">I kept switching to a terminal every time an agent wanted a yes. Orbi watches them for me from the top of the screen, explains each request in one plain line, and only asks when it matters.</p>
+    <ul class="facts">
+      <li><b>1 key</b><span>to approve or deny</span></li>
+      <li><b>45 s</b><span>then your terminal asks</span></li>
+      <li><b>0</b><span>auto-approvals, ever</span></li>
+    </ul>
+    <div class="reel" data-reel role="img" aria-label="Animation: an agent asks for permission, Orbi notices and chimes, shows the request in one line, and the answer comes with one key.">
+      <svg class="reel__svg" viewBox="0 0 300 330" aria-hidden="true">
+        <ellipse cx="150" cy="120" rx="134" ry="44" transform="rotate(-14 150 120)" fill="none" stroke="rgba(236,235,228,.16)" stroke-dasharray="2 5"/>
+        <path d="M 16 120 A 134 44 0 0 0 284 120" transform="rotate(-14 150 120)" fill="none" stroke="#e2ad55" stroke-opacity=".45" stroke-width="1.2" stroke-linecap="round"/>
+        <line class="reel__tether" data-tether x1="150" y1="120" x2="150" y2="120" stroke="#e2ad55" stroke-width="1.2" stroke-dasharray="3 4" stroke-linecap="round"/>
+      </svg>
+      <span class="reel__sat" data-sat><img src="assets/logos/claude.svg" alt=""></span>
+      <span class="reel__sat" data-sat><img src="assets/logos/openai.svg" alt=""></span>
+      <span class="reel__sat" data-sat><img src="assets/logos/opencode.svg" alt=""></span>
+      <span class="reel__moon" data-moon></span>
+      <span class="reel__wave" data-wave></span><span class="reel__wave" data-wave></span><span class="reel__wave" data-wave></span>
+      <span class="reel__face" data-face>
+        <span class="reel__ring" data-ring></span>
+        <i class="reel__eye" data-eye></i><i class="reel__eye" data-eye></i>
+      </span>
+      <p class="reel__status"><i class="reel__eq" data-eq><b></b><b></b><b></b><b></b><b></b></i><span data-status>watching 3 agents</span></p>
+      <div class="reel__card" data-card>
+        <p class="reel__line"><b data-agent>Claude Code</b> wants to run <code data-what>rm -rf dist</code> <em data-warn>deletes files</em></p>
+        <p class="reel__keys-row"><span class="reel__btn" data-btn="allow"><kbd>⌃⌥A</kbd> Allow</span><span class="reel__btn" data-btn="deny"><kbd>⌃⌥D</kbd> Deny</span><span class="reel__timer">45s</span></p>
+        <i class="reel__bar" data-bar></i>
+      </div>
+      <p class="reel__keys" aria-hidden="true"><kbd data-key>⌃</kbd><kbd data-key>⌥</kbd><kbd data-key data-key-last>A</kbd></p>
+      <p class="reel__count">today · <span data-count-allow>11</span> approved · <span data-count-deny>3</span> denied</p>
+      <button type="button" class="reel__sound" data-sound aria-pressed="false"><i><b></b><b></b><b></b></i><span>sound off</span></button>
+    </div>
+    <div class="lane lane--card" aria-hidden="true"><span class="px" data-px="walk"></span></div>
+  </div>
+</section>
+
+<!-- ============================================================ SEE IT WORK -->
+<section class="intro" id="try">
+  <h2 class="lede">Agents ask long questions all day, and most of us rubber-stamp them. Orbi says what they want in <span class="hl">one line</span> — you answer with <span class="hl">one key</span>.</h2>
+  <p class="small small--c">a recording, played live · take over any time with ⌃⌥A / ⌃⌥D</p>
+
+  <!-- a MacBook, with Claude Code running and Orbi in the notch -->
+  <div class="mac-scroll" data-cam>
+  <figure class="mac" data-dash>
+    <div class="mac__lid">
+      <div class="mac__screen">
+        <div class="mac__menubar" aria-hidden="true">
+          <svg class="mb-apple" viewBox="0 0 14 17"><path d="M11.6 9c0-2 1.7-3 1.8-3.1-1-1.4-2.5-1.6-3-1.6-1.3-.1-2.5.8-3.2.8-.7 0-1.7-.8-2.8-.7C3 4.4 1.7 5.2 1 6.5c-1.5 2.6-.4 6.4 1 8.5.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7 1.2 0 1.6.7 2.7.7 1.1 0 1.8-1 2.5-2 .8-1.2 1.1-2.3 1.1-2.4 0 0-2-.8-2-3.7ZM9.5 3c.6-.7 1-1.7.9-2.7-.9 0-1.9.6-2.5 1.3-.5.6-1 1.6-.9 2.6 1 .1 1.9-.5 2.5-1.2Z" fill="currentColor"/></svg>
+          <b>Terminal</b><span>Shell</span><span>Edit</span><span>View</span><span>Window</span>
+          <span class="mb-right"><span class="mb-rec" title="recording"><i></i><span data-rec>00:00</span></span><span class="mb-orbi"><i></i><i></i></span><span class="mb-dim">100%</span><span data-clock>9:41</span></span>
+        </div>
+
+        <!-- Orbi, living in the notch -->
+        <div class="notch">
+          <span class="island island--dash" data-dash-island tabindex="0" aria-label="Orbi">
+            <i class="eye"></i><i class="eye"></i><b class="orbit"></b>
+          </span>
+          <div class="preview" data-preview aria-live="polite">
+            <p class="preview__line" data-line>Watching 2 agents</p>
+            <div class="preview__more">
+              <p class="preview__cmd" data-cmd></p>
+              <p class="preview__meta"><span data-cwd></span><em data-warn></em></p>
+            </div>
+            <div class="preview__keys" data-keys hidden>
+              <button type="button" class="k" data-answer="allow"><kbd>⌃⌥A</kbd> Allow</button>
+              <button type="button" class="k" data-answer="deny"><kbd>⌃⌥D</kbd> Deny</button>
+              <span class="preview__timer" data-timer></span>
+            </div>
+            <i class="preview__bar" data-bar></i>
+          </div>
+        </div>
+
+        <!-- Terminal, running Claude Code -->
+        <div class="win win--term">
+          <div class="win__bar"><span class="lights"><i></i><i></i><i></i></span><span class="win__title">orbi — claude — 96×30</span></div>
+          <div class="cc" data-term>
+            <div class="cc__welcome">
+              <p><span class="cc__star">✻</span> Welcome to <b>Claude Code</b>!</p>
+              <p class="cc__dim">/help for help, /status for your current setup</p>
+              <p class="cc__dim">cwd: ~/code/orbi</p>
+            </div>
+            <div class="cc__log" data-log></div>
+            <div class="cc__input"><span class="cc__caret">&gt;</span> <span data-typed></span><i class="cc__cursor"></i></div>
+            <p class="cc__hint">? for shortcuts</p>
+          </div>
+        </div>
+
+        <!-- Orbi Settings -->
+        <div class="win win--set">
+          <div class="win__bar"><span class="lights"><i></i><i></i><i></i></span><span class="win__title">Orbi</span></div>
+          <div class="set">
+            <nav class="set__side" aria-hidden="true">
+              <p class="is-on"><svg viewBox="0 0 16 16"><circle cx="5" cy="6" r="2.2"/><circle cx="11" cy="6" r="2.2"/><path d="M1.5 13c.6-2 2-3 3.5-3s2.9 1 3.5 3M8 13c.5-1.6 1.7-2.5 3-2.5s2.5.9 3 2.5"/></svg>Agents</p>
+              <p><svg viewBox="0 0 16 16"><path d="M2 4h12M2 8h8M2 12h10"/></svg>Explanations</p>
+              <p><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>General</p>
+              <p><svg viewBox="0 0 16 16"><path d="M8 1.5 13 3.5v4c0 3-2.2 5.3-5 7-2.8-1.7-5-4-5-7v-4z"/></svg>Security</p>
+              <p class="set__today">today<br><span data-n-allow>0</span> approved<br><span data-n-deny>0</span> denied<span hidden data-n-back>0</span></p>
+            </nav>
+            <div class="set__main">
+              <p class="set__h">Agents</p>
+              <p class="set__sub">One small hook per agent. Disconnect removes only that.</p>
+              <ul class="set__list">
+                <li class="is-on" data-agent-row><img src="assets/logos/claude.svg" alt=""><span class="set__name">Claude Code<em data-agent-state>Approvals · connected</em></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="Claude Code" data-toggle></button></li>
+                <li class="is-on" data-agent-row><img src="assets/logos/openai.svg" alt=""><span class="set__name">Codex<em data-agent-state>Approvals · connected</em></span><button type="button" class="sw" role="switch" aria-checked="true" aria-label="Codex" data-toggle></button></li>
+                <li data-agent-row data-demo-toggle><img src="assets/logos/opencode.svg" alt=""><span class="set__name">OpenCode<em data-agent-state>Approvals · off</em></span><button type="button" class="sw" role="switch" aria-checked="false" aria-label="OpenCode" data-toggle></button></li>
+                <li data-agent-row><img src="assets/logos/gemini.svg" alt=""><span class="set__name">Gemini CLI<em data-agent-state>Status · off</em></span><button type="button" class="sw" role="switch" aria-checked="false" aria-label="Gemini CLI" data-toggle></button></li>
+                <li data-agent-row><img class="is-photo" src="assets/logos/hermes.png" alt=""><span class="set__name">Hermes<em data-agent-state>Status · off</em></span><button type="button" class="sw" role="switch" aria-checked="false" aria-label="Hermes" data-toggle></button></li>
+              </ul>
+              <div class="set__foot">
+                <div class="set__row"><span>Approval timeout</span><span class="set__slider"><i style="--v:22%"></i><b>45s</b></span></div>
+                <div class="set__row"><span>Explanations</span><span class="seg"><b>Rules</b><i>Model</i></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- the Dock -->
+        <div class="dock" aria-hidden="true">
+          <span class="dock__app dock__app--term is-open">&gt;_</span>
+          <span class="dock__app is-open"><img src="assets/brand/orbi-app-icon-512.png" alt=""></span>
+          <span class="dock__sep"></span>
+          <span class="dock__app dock__app--logo"><img src="assets/logos/claude.svg" alt=""></span>
+          <span class="dock__app dock__app--logo"><img src="assets/logos/openai.svg" alt=""></span>
+          <span class="dock__app dock__app--logo"><img src="assets/logos/cursor.svg" alt=""></span>
+        </div>
+
+        <!-- screen-recording overlays -->
+        <p class="keycast" data-keycast aria-hidden="true"></p>
+        <svg class="pointer" data-pointer viewBox="0 0 16 22" aria-hidden="true"><path d="M1 1v16.5l4.2-4 2.7 6.3 2.6-1.1-2.7-6.2H14z" fill="#fff" stroke="#000" stroke-width="1.1" stroke-linejoin="round"/></svg>
+        <i class="ripple" data-ripple aria-hidden="true"></i>
+      </div>
+    </div>
+    <div class="mac__base" aria-hidden="true"><i></i></div>
+    <div class="mac__floor" aria-hidden="true"></div>
+  </figure>
+  </div>
+  <p class="mac-hint" aria-hidden="true">swipe to see the rest of the screen →</p>
+
+  <div class="legal-row">
+    <p class="legal">orbi is not affiliated with anthropic, openai, google, cursor or nous research · product names and logos belong to their owners</p>
+    <span class="px px--reader" data-px="read" aria-hidden="true"></span>
+  </div>
+</section>
+
+<!-- ============================================================ RULES -->
+<section class="band band--two" id="rules">
+  <div class="card card--two">
+    <p class="card__tag card__tag--c">the rules orbi lives by</p>
+    <h2 class="manifesto">
+      <span>Your agent should never act without you.</span>
+      <span class="fade">Nothing is approved unless you press ⌃⌥A yourself.</span>
+    </h2>
+    <ul class="rules">
+      <li>No answer in 45 s → your terminal asks</li>
+      <li>Quit Orbi → agents work exactly as before</li>
+      <li>Local only · 127.0.0.1 · signed handshake</li>
+    </ul>
+    <span class="px px--detective" data-px="detective" aria-hidden="true"></span>
+  </div>
+</section>
+
+<!-- ============================================================ FOOTER -->
+<!-- ============================================================ INSTALL -->
+<section class="install" id="install">
+  <p class="card__tag card__tag--c">installation</p>
+  <h2 class="install__h">Three ways to get Orbi.</h2>
+  <p class="install__sub">Free and open source. Needs macOS 13 or newer on an Apple Silicon Mac.</p>
+  <div class="install__grid">
+    <article class="way">
+      <p class="way__n">01</p>
+      <h3 class="way__h">Download for Mac</h3>
+      <p class="way__p">Get the disk image, open it, and drag Orbi into Applications. Orbi isn't notarized by Apple, so the first time, right-click Orbi and choose Open.</p>
+      <div class="way__foot">
+        <a class="way__btn way__btn--main" href="Orbi.dmg" download>Download Orbi.dmg</a>
+        <a class="way__link" href="Orbi.dmg.sha256">SHA-256</a>
+      </div>
+    </article>
+    <article class="way">
+      <p class="way__n">02</p>
+      <h3 class="way__h">Install with one command</h3>
+      <p class="way__p">Paste this into Terminal. It checks the download against its checksum, installs Orbi and opens it — no security prompt.</p>
+      <pre class="way__code"><code>curl -fsSL <span data-origin>https://orbi-xi-jet.vercel.app</span><wbr>/install.sh | sh</code></pre>
+      <div class="way__foot">
+        <button type="button" class="way__btn way__btn--main" data-copy><b>Copy command</b></button>
+      </div>
+    </article>
+    <article class="way">
+      <p class="way__n">03</p>
+      <h3 class="way__h">Read the script first</h3>
+      <p class="way__p">Prefer to look before you run? Download the installer, read it — it's short on purpose — then run it yourself.</p>
+      <pre class="way__code"><code>curl -fsSLO <span data-origin>https://orbi-xi-jet.vercel.app</span><wbr>/install.sh
+less install.sh
+sh install.sh</code></pre>
+      <div class="way__foot">
+        <a class="way__btn" href="install.sh">View install.sh</a>
+      </div>
+    </article>
+  </div>
+</section>
+
+<footer class="foot" id="foot">
+  <div class="lane lane--foot" aria-hidden="true"><span class="px" data-px="walk"></span><span class="px px--late" data-px="type"></span></div>
+  <h2 class="lede lede--out">When your agent needs you, Orbi will be there — at the top of your screen, or quietly out of your way.</h2>
+
+  <div class="foot__grid">
+    <div class="foot__brand">
+      <a class="brand" href="#top"><img class="brand__mark" src="assets/brand/orbi-mark-light.svg" alt="" width="40" height="40">Orbi</a>
+      <p>A face for your AI agents. Free and open source for macOS. Not affiliated with Anthropic, OpenAI, Google, Cursor or Nous Research.</p>
+      <a class="pill pill--light" href="Orbi.dmg" download>Download for Mac</a>
+    </div>
+  </div>
+
+  <div class="foot__bottom">
+    <span>© 2026 Orbi · MIT licensed</span>
+    <span class="foot__links"><a href="security.html">Security</a><a href="privacy.html">Privacy</a><a href="license.html">License</a><a href="changelog.html">Changelog</a></span>
+    <a href="#top">Back to top ↑</a>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
+<script src="main.js?v=19" defer></script>
+<!-- Dev-only feedback toolbar: does nothing unless served from localhost. -->
+<script type="module" src="agentation.js?v=19"></script>
+</body>
+</html>

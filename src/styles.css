@@ -1,0 +1,519 @@
+:root {
+  --orbi-shell: #09090c;
+  --orbi-card: rgba(12, 12, 16, 0.94);
+  --orbi-border: rgba(255, 255, 255, 0.1);
+  --orbi-eye-hi: #ffffff;
+  --orbi-eye: #e6eaff;
+  --orbi-eye-lo: #aeb6d9;
+  --orbi-stroke: #eef0ff;
+  --orbi-text: rgba(255, 255, 255, 0.94);
+  --orbi-text-2: rgba(255, 255, 255, 0.7);
+  --orbi-text-3: rgba(255, 255, 255, 0.52);
+
+  --orbi-working: #8f9bff;
+  --orbi-asking: #ffb224;
+  --orbi-done: #3fd68a;
+  --orbi-error: #ff6b6b;
+
+  --orbi-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+  color: var(--orbi-text);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+/* The widget window is transparent at the OS level; the webview must be too. */
+html,
+body,
+#root {
+  background: transparent;
+  overflow: hidden;
+}
+
+/* ---- widget layout ------------------------------------------------------ */
+
+.orbi-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 320px;
+  /* Room for the card's shadow; counted in the height sent to Rust. */
+  padding-bottom: 6px;
+}
+
+/* ---- face --------------------------------------------------------------- */
+
+.orbi-face {
+  position: relative;
+  flex: none;
+  --tint: transparent;
+}
+.orbi-face[data-state="working"] { --tint: var(--orbi-working); }
+.orbi-face[data-state="asking"] { --tint: var(--orbi-asking); }
+.orbi-face[data-state="done"] { --tint: var(--orbi-done); }
+.orbi-face[data-state="error"] { --tint: var(--orbi-error); }
+
+/* Flat top (it hangs from the screen edge), fully round bottom. */
+.orbi-face-shell,
+.orbi-face-glow {
+  position: absolute;
+  inset: 0;
+  border-radius: 0 0 20px 20px;
+}
+
+.orbi-face-shell {
+  overflow: hidden;
+  background: var(--orbi-shell);
+  /* Hairline on the sides and bottom only; the top meets the bezel. */
+  box-shadow:
+    inset 1px 0 0 var(--orbi-border),
+    inset -1px 0 0 var(--orbi-border),
+    inset 0 -1px 0 var(--orbi-border);
+  transition: box-shadow 0.3s ease;
+}
+
+.orbi-face-tint {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 120% at 50% 100%, var(--tint), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.orbi-face[data-state="working"] .orbi-face-tint { opacity: 0.14; }
+.orbi-face[data-state="asking"] .orbi-face-tint { opacity: 0.32; }
+.orbi-face[data-state="done"] .orbi-face-tint,
+.orbi-face[data-state="error"] .orbi-face-tint {
+  animation: orbi-flash 1.6s ease-out forwards;
+}
+
+@keyframes orbi-flash {
+  0% { opacity: 0.6; }
+  100% { opacity: 0.22; }
+}
+
+.orbi-face[data-state="asking"] .orbi-face-shell {
+  box-shadow:
+    inset 1px 0 0 rgba(255, 178, 36, 0.5),
+    inset -1px 0 0 rgba(255, 178, 36, 0.5),
+    inset 0 -1px 0 rgba(255, 178, 36, 0.7);
+}
+
+.orbi-face-glow {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.orbi-face[data-state="asking"] .orbi-face-glow {
+  box-shadow:
+    0 4px 14px rgba(255, 170, 30, 0.55),
+    0 8px 32px rgba(255, 150, 20, 0.35);
+  animation: orbi-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes orbi-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+.orbi-face-art {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  overflow: visible;
+}
+
+.orbi-eyes {
+  transform-box: fill-box;
+  transform-origin: center;
+  translate: calc(var(--orbi-gaze-x, 0px) + var(--orbi-eyes-dx, 0px))
+    calc(var(--orbi-gaze-y, 0px) + var(--orbi-eyes-dy, 0px));
+  scale: calc(var(--orbi-rig-eye-sx, 1) * var(--orbi-eyes-s, 1))
+    calc(var(--orbi-rig-eye-sy, 1) * var(--orbi-eyes-s, 1));
+  rotate: var(--orbi-rig-eye-tilt, 0deg);
+}
+
+.orbi-eye-stroke {
+  fill: none;
+  stroke: var(--orbi-stroke);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.orbi-face[data-state="done"] .orbi-eye-stroke { stroke: #c9f7dc; }
+.orbi-face[data-state="error"] .orbi-eye-stroke { stroke: #ffc2c2; }
+.orbi-face[data-state="asking"] { --orbi-eye-hi: #fffaf0; --orbi-eye: #ffeccc; --orbi-eye-lo: #e7b867; }
+
+.orbi-orbit-track {
+  fill: none;
+  stroke: rgba(143, 155, 255, 0.14);
+  stroke-width: 1;
+}
+.orbi-orbit-dot {
+  fill: #c3caff;
+}
+
+.orbi-badge {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  margin-top: -8px;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 8px;
+  background: var(--orbi-asking);
+  color: #1d1300;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- preview card ------------------------------------------------------- */
+
+.orbi-card {
+  position: relative;
+  box-sizing: border-box;
+  width: 304px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--orbi-card);
+  border: 1px solid var(--orbi-border);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  backdrop-filter: blur(20px) saturate(1.4);
+  font-size: 12px;
+  line-height: 18px;
+  transform-origin: 50% 0;
+}
+.orbi-card[data-mode="asking"] {
+  border-color: rgba(255, 178, 36, 0.28);
+}
+
+.orbi-line {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.orbi-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--orbi-text-2);
+}
+.orbi-muted { color: var(--orbi-text-3); }
+
+.orbi-agent {
+  color: var(--orbi-text);
+  font-weight: 600;
+}
+
+.orbi-chip,
+.orbi-mono,
+.orbi-code,
+.orbi-num {
+  font-family: var(--orbi-mono);
+}
+
+.orbi-chip {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  color: var(--orbi-text);
+  font-size: 11px;
+}
+
+.orbi-warn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 8px;
+  background: rgba(255, 178, 36, 0.14);
+  color: #ffc766;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.orbi-status {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orbi-text-3);
+}
+.orbi-status-working {
+  background: var(--orbi-working);
+  animation: orbi-pulse 1.4s ease-in-out infinite;
+}
+.orbi-status-done { background: var(--orbi-done); }
+.orbi-status-error { background: var(--orbi-error); }
+.orbi-status-paused {
+  width: 7px;
+  height: 8px;
+  border-radius: 0;
+  background: none;
+  border-left: 2px solid var(--orbi-text-3);
+  border-right: 2px solid var(--orbi-text-3);
+  box-sizing: border-box;
+}
+
+.orbi-hints {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--orbi-text-3);
+}
+.orbi-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--orbi-text-2);
+}
+.orbi-key kbd {
+  font-family: inherit;
+  font-size: 10.5px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  color: var(--orbi-text);
+  letter-spacing: 0.5px;
+}
+.orbi-hint-end { margin-left: auto; display: inline-flex; }
+
+.orbi-timer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 178, 36, 0.3), var(--orbi-asking));
+  transform-origin: 0 50%;
+  animation-name: orbi-deplete;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes orbi-deplete {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* ---- expanded detail ---------------------------------------------------- */
+
+.orbi-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 3px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  padding-bottom: 3px;
+}
+
+.orbi-code {
+  margin: 0;
+  max-height: calc(8 * 16px);
+  overflow: auto;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--orbi-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.orbi-meta {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 3px 8px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 18px;
+}
+.orbi-meta dt {
+  color: var(--orbi-text-3);
+}
+.orbi-meta dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--orbi-text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.orbi-warn-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orbi-num {
+  color: var(--orbi-asking);
+  font-variant-numeric: tabular-nums;
+}
+
+.orbi-queue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 11px;
+  color: var(--orbi-text-3);
+}
+.orbi-queue-head {
+  color: var(--orbi-text-2);
+  font-weight: 600;
+  margin-right: 2px;
+}
+.orbi-queue-item {
+  padding: 0 6px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  line-height: 18px;
+  color: var(--orbi-text-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .orbi-eyes {
+    translate: none;
+  }
+  .orbi-face[data-state="asking"] .orbi-face-glow,
+  .orbi-status-working {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* ---- #demo gallery (browser only) --------------------------------------- */
+
+html.demo-mode,
+html.demo-mode body,
+html.demo-mode #root {
+  background: #050507;
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+}
+
+.demo {
+  padding: 32px;
+}
+.demo-head h1 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.demo-head p {
+  margin: 0 0 24px;
+  font-size: 12px;
+  color: var(--orbi-text-3);
+}
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 340px);
+  gap: 28px 24px;
+  align-items: start;
+}
+.demo-cell {
+  margin: 0;
+}
+.demo-screen {
+  position: relative;
+  width: 340px;
+  height: 150px;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 20% 110%, #1b2340 0%, transparent 60%),
+    radial-gradient(90% 80% at 90% 120%, #2a1830 0%, transparent 60%),
+    #0e0f14;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+.demo-cell[data-tall] .demo-screen {
+  height: 360px;
+}
+.demo-menubar {
+  height: 24px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.demo-window {
+  position: absolute;
+  top: 0;
+  left: 10px;
+  width: 320px;
+  outline: 1px dashed rgba(255, 255, 255, 0.07);
+}
+.demo-cell figcaption {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--orbi-text-3);
+}
+
+/* ---- settings gear (expanded card only) --------------------------------- */
+
+.orbi-gear {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin: -2px -4px -2px auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--orbi-text-3);
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.orbi-hint-end + .orbi-gear {
+  margin-left: 2px;
+}
+.orbi-gear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--orbi-text);
+}
+.orbi-gear:focus-visible {
+  outline: 1.5px solid var(--orbi-working);
+  outline-offset: 1px;
+}
+
+/* ⌃⌥A held back because the front request just changed: a small headshake. */
+.orbi-nudge {
+  animation: orbi-nudge 360ms cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes orbi-nudge {
+  20%, 60% { transform: translateX(-4px); }
+  40%, 80% { transform: translateX(4px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbi-nudge { animation: none; }
+}

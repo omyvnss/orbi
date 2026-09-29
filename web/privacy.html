@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Orbi</title>
+<meta name="description" content="Orbi collects nothing. Everything stays on your Mac.">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Orbi">
+<meta property="og:title" content="Privacy — Orbi">
+<meta property="og:description" content="Orbi collects nothing. Everything stays on your Mac.">
+<meta property="og:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=19">
+</head>
+<body class="doc">
+<header class="doc__top"><a class="brand" href="index.html"><img class="brand__mark" src="assets/brand/orbi-mark-light.svg" alt="" width="40" height="40">Orbi</a><a href="index.html">← Back to Orbi</a></header>
+<article>
+  <h1>Privacy</h1>
+  <p class="lead">Orbi collects nothing. There are no accounts, no analytics and no cloud.</p>
+
+  <h2>What stays on your Mac</h2>
+  <ul>
+    <li>The commands, file paths and requests your agents send to Orbi are shown on your screen and then forgotten. They are never stored or uploaded.</li>
+    <li>Orbi's settings, token and port live in <code>~/Library/Application Support/Orbi</code>.</li>
+    <li>Explanations are written by built-in rules, on your Mac, instantly.</li>
+  </ul>
+
+  <h2>Optional: your own model</h2>
+  <p>If you turn on model explanations in Settings, the request (for example the command an agent wants to run) is sent to the provider <em>you</em> choose — such as Ollama on your own Mac, or OpenRouter. Orbi shows a notice before you enable a cloud provider. API keys are kept in the macOS Keychain.</p>
+
+  <h2>This website</h2>
+  <p>This site has no trackers or cookies. Fonts load from Google Fonts.</p>
+</article>
+</body>
+</html>

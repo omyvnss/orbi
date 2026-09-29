@@ -1,0 +1,43 @@
+<!doctype html>
+<!-- Orbi link preview (Open Graph / social card). Rendered at 1200×630 and 1280×640
+     by render-page.cjs; everything is sized in vw so both come out the same. -->
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Geist:wght@400;500&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 100vw; height: 100vh; overflow: hidden; }
+  body { position: relative; background: #d3d4c2; color: #0b0b0b; font-family: Geist, system-ui, sans-serif; }
+
+  /* the orbit, faint, sweeping behind everything */
+  .orbit { position: absolute; left: -8vw; top: 3vw; width: 116vw; height: 40vw; }
+
+  /* Orbi in the notch */
+  .notch { position: absolute; left: 50%; top: 0; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 3.4vw; width: 24vw; height: 5.6vw; border-radius: 0 0 2.6vw 2.6vw; background: #0b0b0c; }
+  .eye { width: 2.1vw; height: 2.4vw; border-radius: 50%; background: #efc57a; }
+  .line { position: absolute; left: 50%; top: 7.4vw; transform: translateX(-50%); display: flex; align-items: center; gap: 1.4vw; padding: 1vw 1vw 1vw 1.8vw; border-radius: 1.4vw; background: #0f0f11; color: rgba(236, 235, 228, 0.72); font-size: 1.75vw; white-space: nowrap; box-shadow: 0 1.6vw 3.4vw -1.6vw rgba(0, 0, 0, 0.45); }
+  .line b { color: #fff; font-weight: 500; }
+  .line code { font-family: "Geist Mono", monospace; font-size: 0.92em; color: #fff; padding: 0.15vw 0.6vw; border-radius: 0.5vw; background: rgba(255, 255, 255, 0.08); }
+  .key { margin-left: 0.4vw; font-family: Geist, sans-serif; font-weight: 500; font-size: 0.9em; color: #0b0b0b; padding: 0.55vw 1vw; border-radius: 0.8vw; background: #ecebe4; }
+
+  .head { position: absolute; left: 5.4vw; bottom: 5.2vw; font: 600 8.2vw/0.92 "Bricolage Grotesque", sans-serif; letter-spacing: -0.05em; }
+  .brand { position: absolute; right: 5.4vw; bottom: 5.8vw; display: flex; flex-direction: column; align-items: flex-end; gap: 0.9vw; }
+  .brand .brand__row { display: flex; color: #0b0b0b; align-items: center; gap: 1vw; font: 600 2.9vw/1 "Bricolage Grotesque", sans-serif; letter-spacing: -0.03em; }
+  .brand img { width: 6.2vw; height: auto; margin: -1.4vw -0.6vw; }
+  .brand p { font: 1.3vw/1 "Geist Mono", monospace; color: rgba(11, 11, 11, 0.55); }
+</style>
+
+<svg class="orbit" viewBox="0 0 1160 400" aria-hidden="true">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#b8862f" stop-opacity="0"/><stop offset=".45" stop-color="#b8862f" stop-opacity=".55"/><stop offset="1" stop-color="#b8862f" stop-opacity="0"/></linearGradient></defs>
+  <ellipse cx="580" cy="200" rx="560" ry="120" transform="rotate(-7 580 200)" fill="none" stroke="rgba(11,11,11,.13)" stroke-dasharray="3 9"/>
+  <path d="M 20 200 A 560 120 0 0 0 1140 200" transform="rotate(-7 580 200)" fill="none" stroke="url(#g)" stroke-width="2"/>
+  <circle cx="872" cy="302" r="7" fill="#b8862f" opacity=".8"/>
+</svg>
+
+<div class="notch"><i class="eye"></i><i class="eye"></i></div>
+<p class="line"><span><b>Claude Code</b> wants to run <code>npm test</code></span><span class="key">⌃⌥A</span></p>
+
+<h1 class="head">Give your agent<br>a face.</h1>
+<div class="brand">
+  <p class="brand__row"><img src="../orbi-mark.svg" alt="">Orbi</p>
+  <p>open source · for macOS</p>
+</div>

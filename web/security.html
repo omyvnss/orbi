@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Security — Orbi</title>
+<meta name="description" content="How Orbi keeps approvals safe: local only, signed handshake, never auto-approves.">
+<link rel="icon" href="assets/brand/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="assets/brand/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Orbi">
+<meta property="og:title" content="Security — Orbi">
+<meta property="og:description" content="How Orbi keeps approvals safe: local only, signed handshake, never auto-approves.">
+<meta property="og:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://orbi-xi-jet.vercel.app/assets/brand/og.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css?v=19">
+</head>
+<body class="doc">
+<header class="doc__top"><a class="brand" href="index.html"><img class="brand__mark" src="assets/brand/orbi-mark-light.svg" alt="" width="40" height="40">Orbi</a><a href="index.html">← Back to Orbi</a></header>
+<article>
+  <h1>Security</h1>
+  <p class="lead">Orbi can say yes to an agent's shell command, so it is built to be the careful one.</p>
+
+  <h2>Only you approve</h2>
+  <ul>
+    <li>Orbi never approves anything by itself. Only your <b>⌃⌥A</b> does.</li>
+    <li>A keypress only counts for a request that has been on screen, unchanged, long enough to read — so it can't land on a request that just replaced another.</li>
+    <li>No answer in 45 seconds (you can change this) → the agent asks you in its own terminal, as it always did.</li>
+    <li>Answer in the terminal instead, and Orbi drops its copy of the request.</li>
+  </ul>
+
+  <h2>Local only</h2>
+  <ul>
+    <li>Orbi listens on <code>127.0.0.1</code> only — nothing on your network can reach it.</li>
+    <li>Every request needs a random 256-bit token stored in <code>~/Library/Application Support/Orbi</code>, readable only by you.</li>
+    <li>Before sending the token, Orbi's helper checks a signed handshake, so another program sitting on Orbi's port can't pose as Orbi.</li>
+    <li>Browser requests are refused, so a website can't talk to Orbi.</li>
+  </ul>
+
+  <h2>When Orbi isn't running</h2>
+  <p>The helper exits instantly and prints nothing. Your agents behave exactly as if Orbi were never installed. Delete Orbi.app and the hooks it added become harmless no-ops; disconnect an agent in Settings to remove them entirely.</p>
+
+  <h2>Reporting an issue</h2>
+  <p>Found a way to get an approval without a keypress, or anything else that worries you? Please report it privately to the maintainers before sharing it publicly, and include the steps to reproduce it.</p>
+</article>
+</body>
+</html>

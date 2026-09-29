@@ -1,0 +1,14 @@
+{
+  "name": "Orbi — a face for your AI agents",
+  "short_name": "Orbi",
+  "description": "See every AI agent at a glance. Approve with ⌃⌥A.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#d3d4c2",
+  "theme_color": "#d3d4c2",
+  "icons": [
+    { "src": "/assets/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/brand/orbi-app-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/brand/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
