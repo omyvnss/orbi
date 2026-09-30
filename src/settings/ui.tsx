@@ -22,6 +22,7 @@ export const ICONS = {
   plug: "M6 2v3M10 2v3M4.5 5h7v2.5a3.5 3.5 0 0 1-7 0ZM8 11v3",
   terminal: "M2.5 3.5h11v9h-11ZM5 6.5l2 1.5-2 1.5M8.5 10h2.5",
   refresh: "M13 8a5 5 0 1 1-1.5-3.6M13 2.5v2.8h-2.8",
+  appearance: "M2.5 4.5h11v3a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3ZM6 7.2v.1M10 7.2v.1M5 13h6",
 } as const;
 
 export function Spinner() {
@@ -207,6 +208,8 @@ export function Confirm({
   onConfirm,
   onCancel,
   busy,
+  variant = "danger",
+  wide = false,
 }: {
   open: boolean;
   title: string;
@@ -215,6 +218,9 @@ export function Confirm({
   onConfirm: () => void;
   onCancel: () => void;
   busy?: boolean;
+  variant?: "primary" | "danger";
+  /** Room for a code preview. */
+  wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -227,7 +233,7 @@ export function Confirm({
   return (
     <dialog
       ref={ref}
-      className="s-dialog"
+      className={`s-dialog${wide ? " s-dialog-wide" : ""}`}
       aria-labelledby={id}
       onCancel={(e) => {
         e.preventDefault();
@@ -242,7 +248,7 @@ export function Confirm({
         <Button onClick={onCancel} disabled={busy} autoFocus>
           Cancel
         </Button>
-        <Button variant="danger" onClick={onConfirm} busy={busy}>
+        <Button variant={variant} onClick={onConfirm} busy={busy}>
           {confirmLabel}
         </Button>
       </div>

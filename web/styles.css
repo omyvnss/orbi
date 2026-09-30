@@ -652,3 +652,12 @@ kbd { font-family: var(--sans); font-size: 0.86em; font-weight: 500; color: #fff
 
 /* entrance — hidden only until the entrance animation runs (see main.js) */
 .js:not(.rise-done) :is(.pitch > *, .sol, .capsule, .note, .caps) { opacity: 0; }
+
+/* planets are just the agents' logos, in circles */
+.planet__b { gap: 0; padding: calc(2.2 * var(--u)); border-radius: 50%; }
+.planet__b b { width: max(34px, calc(17 * var(--u))); height: max(34px, calc(17 * var(--u))); }
+.planet__b b.is-text { font-size: max(12px, calc(5.6 * var(--u))); }
+@media (max-width: 700px) {
+  .planet__b { padding: 4px; }
+  .planet__b b { width: 38px; height: 38px; }
+}

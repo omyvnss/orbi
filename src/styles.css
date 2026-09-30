@@ -1,19 +1,20 @@
 :root {
-  --orbi-shell: #09090c;
-  --orbi-card: rgba(12, 12, 16, 0.94);
-  --orbi-border: rgba(255, 255, 255, 0.1);
-  --orbi-eye-hi: #ffffff;
-  --orbi-eye: #e6eaff;
-  --orbi-eye-lo: #aeb6d9;
-  --orbi-stroke: #eef0ff;
-  --orbi-text: rgba(255, 255, 255, 0.94);
-  --orbi-text-2: rgba(255, 255, 255, 0.7);
-  --orbi-text-3: rgba(255, 255, 255, 0.52);
+  /* Orbi's palette — the same ink, cream and gold as the logo and the site. */
+  --orbi-shell: #0b0b0c;
+  --orbi-card: rgba(11, 11, 12, 0.96);
+  --orbi-border: rgba(236, 235, 228, 0.12);
+  --orbi-eye-hi: #fffdf6;
+  --orbi-eye: #ecebe4;
+  --orbi-eye-lo: #d4cfbf;
+  --orbi-stroke: #ecebe4;
+  --orbi-text: #f3f1ea;
+  --orbi-text-2: rgba(236, 235, 228, 0.74);
+  --orbi-text-3: rgba(236, 235, 228, 0.5);
 
-  --orbi-working: #8f9bff;
-  --orbi-asking: #ffb224;
-  --orbi-done: #3fd68a;
-  --orbi-error: #ff6b6b;
+  --orbi-working: #e2c48c;
+  --orbi-asking: #e2ad55;
+  --orbi-done: #8fc79a;
+  --orbi-error: #e27a6e;
 
   --orbi-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -69,6 +70,12 @@ body,
   border-radius: 0 0 20px 20px;
 }
 
+/* Placed away from the top edge (Settings → Appearance): a full capsule. */
+.orbi-face[data-floating] .orbi-face-shell,
+.orbi-face[data-floating] .orbi-face-glow {
+  border-radius: 20px;
+}
+
 .orbi-face-shell {
   overflow: hidden;
   background: var(--orbi-shell);
@@ -80,53 +87,58 @@ body,
   transition: box-shadow 0.3s ease;
 }
 
-.orbi-face-tint {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(60% 120% at 50% 100%, var(--tint), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-}
-.orbi-face[data-state="working"] .orbi-face-tint { opacity: 0.14; }
-.orbi-face[data-state="asking"] .orbi-face-tint { opacity: 0.32; }
-.orbi-face[data-state="done"] .orbi-face-tint,
-.orbi-face[data-state="error"] .orbi-face-tint {
-  animation: orbi-flash 1.6s ease-out forwards;
-}
+.orbi-face-tint { display: none; }
 
-@keyframes orbi-flash {
-  0% { opacity: 0.6; }
-  100% { opacity: 0.22; }
-}
-
+/* Asking: a solid gold edge, and a thin ring just outside it that breathes. */
 .orbi-face[data-state="asking"] .orbi-face-shell {
   box-shadow:
-    inset 1px 0 0 rgba(255, 178, 36, 0.5),
-    inset -1px 0 0 rgba(255, 178, 36, 0.5),
-    inset 0 -1px 0 rgba(255, 178, 36, 0.7);
+    inset 1.5px 0 0 var(--orbi-asking),
+    inset -1.5px 0 0 var(--orbi-asking),
+    inset 0 -1.5px 0 var(--orbi-asking);
+}
+.orbi-face[data-floating][data-state="asking"] .orbi-face-shell {
+  box-shadow: inset 0 0 0 1.5px var(--orbi-asking);
+}
+.orbi-face[data-state="done"] .orbi-face-shell {
+  box-shadow:
+    inset 1px 0 0 rgba(143, 199, 154, 0.55),
+    inset -1px 0 0 rgba(143, 199, 154, 0.55),
+    inset 0 -1px 0 var(--orbi-done);
+}
+.orbi-face[data-state="error"] .orbi-face-shell {
+  box-shadow:
+    inset 1px 0 0 rgba(226, 122, 110, 0.55),
+    inset -1px 0 0 rgba(226, 122, 110, 0.55),
+    inset 0 -1px 0 var(--orbi-error);
 }
 
 .orbi-face-glow {
+  inset: -4px;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 .orbi-face[data-state="asking"] .orbi-face-glow {
-  box-shadow:
-    0 4px 14px rgba(255, 170, 30, 0.55),
-    0 8px 32px rgba(255, 150, 20, 0.35);
+  border-radius: 0 0 24px 24px;
+  box-shadow: inset 0 -1px 0 var(--orbi-asking), inset 1px 0 0 var(--orbi-asking), inset -1px 0 0 var(--orbi-asking);
   animation: orbi-pulse 1.8s ease-in-out infinite;
+}
+.orbi-face[data-floating][data-state="asking"] .orbi-face-glow {
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 1px var(--orbi-asking);
 }
 
 @keyframes orbi-pulse {
-  0%, 100% { opacity: 0.55; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.9; }
 }
 
+/* The artwork stays centred however wide or tall the pill is stretched —
+   and under a real notch, centred in the part below the camera. */
 .orbi-face-art {
   position: absolute;
-  top: 0;
+  top: calc(var(--orbi-notch-h, 0px) + (100% - var(--orbi-notch-h, 0px)) / 2);
   left: 50%;
-  translate: -50% 0;
+  translate: -50% -50%;
   overflow: visible;
 }
 
@@ -147,23 +159,23 @@ body,
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.orbi-face[data-state="done"] .orbi-eye-stroke { stroke: #c9f7dc; }
-.orbi-face[data-state="error"] .orbi-eye-stroke { stroke: #ffc2c2; }
-.orbi-face[data-state="asking"] { --orbi-eye-hi: #fffaf0; --orbi-eye: #ffeccc; --orbi-eye-lo: #e7b867; }
+.orbi-face[data-state="done"] .orbi-eye-stroke { stroke: var(--orbi-done); }
+.orbi-face[data-state="error"] .orbi-eye-stroke { stroke: var(--orbi-error); }
+.orbi-face[data-state="asking"] { --orbi-eye-hi: #fff6df; --orbi-eye: #efc57a; --orbi-eye-lo: #d69a3e; }
 
 .orbi-orbit-track {
   fill: none;
-  stroke: rgba(143, 155, 255, 0.14);
+  stroke: rgba(236, 235, 228, 0.1);
   stroke-width: 1;
 }
 .orbi-orbit-dot {
-  fill: #c3caff;
+  fill: var(--orbi-working);
 }
 
 .orbi-badge {
   position: absolute;
   right: 9px;
-  top: 50%;
+  top: calc(var(--orbi-notch-h, 0px) + (100% - var(--orbi-notch-h, 0px)) / 2);
   margin-top: -8px;
   height: 16px;
   min-width: 16px;
@@ -171,7 +183,7 @@ body,
   box-sizing: border-box;
   border-radius: 8px;
   background: var(--orbi-asking);
-  color: #1d1300;
+  color: #0b0b0c;
   font-size: 10px;
   font-weight: 700;
   line-height: 16px;
@@ -201,7 +213,7 @@ body,
   transform-origin: 50% 0;
 }
 .orbi-card[data-mode="asking"] {
-  border-color: rgba(255, 178, 36, 0.28);
+  border-color: rgba(226, 173, 85, 0.55);
 }
 
 .orbi-line {
@@ -250,8 +262,8 @@ body,
   height: 16px;
   padding: 0 6px;
   border-radius: 8px;
-  background: rgba(255, 178, 36, 0.14);
-  color: #ffc766;
+  background: rgba(226, 173, 85, 0.16);
+  color: #efc57a;
   font-size: 10.5px;
   font-weight: 600;
   white-space: nowrap;
@@ -312,7 +324,7 @@ body,
   right: 0;
   bottom: 0;
   height: 2px;
-  background: linear-gradient(90deg, rgba(255, 178, 36, 0.3), var(--orbi-asking));
+  background: var(--orbi-asking);
   transform-origin: 0 50%;
   animation-name: orbi-deplete;
   animation-timing-function: linear;
@@ -451,9 +463,8 @@ html.demo-mode #root {
   border-radius: 12px;
   overflow: hidden;
   background:
-    radial-gradient(120% 90% at 20% 110%, #1b2340 0%, transparent 60%),
-    radial-gradient(90% 80% at 90% 120%, #2a1830 0%, transparent 60%),
-    #0e0f14;
+    radial-gradient(90% 80% at 80% 120%, rgba(226, 173, 85, 0.18) 0%, transparent 60%),
+    #0d0d0f;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 .demo-cell[data-tall] .demo-screen {
@@ -517,3 +528,129 @@ html.demo-mode #root {
 @media (prefers-reduced-motion: reduce) {
   .orbi-nudge { animation: none; }
 }
+
+/* ---- under a real notch --------------------------------------------------- */
+
+/* Two small concave "ears" at the top corners, so the pill flows out of the
+   screen edge the way the camera housing does, instead of a hard corner. */
+.orbi-face[data-docked]::before,
+.orbi-face[data-docked]::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 10px;
+  height: 10px;
+  pointer-events: none;
+}
+.orbi-face[data-docked]::before {
+  left: -10px;
+  background: radial-gradient(circle at 0 100%, transparent 9.5px, var(--orbi-shell) 10px);
+}
+.orbi-face[data-docked]::after {
+  right: -10px;
+  background: radial-gradient(circle at 100% 100%, transparent 9.5px, var(--orbi-shell) 10px);
+}
+
+/* Tucked away (nothing running): only the notch-sized shell remains. */
+.orbi-face[data-tucked] .orbi-face-art,
+.orbi-face[data-tucked] .orbi-badge {
+  opacity: 0;
+}
+.orbi-face-art { transition: opacity 0.25s ease; }
+
+/* #demo?notch: the camera housing, drawn over the tile (hardware covers these pixels). */
+.demo-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  translate: -50% 0;
+  border-radius: 0 0 10px 10px;
+  background: #000;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+/* ---- sessions and questions ---------------------------------------------- */
+
+/* A dot per running session, at the left of the pill, when there are two or more. */
+.orbi-dots {
+  position: absolute;
+  left: 12px;
+  top: calc(var(--orbi-notch-h, 0px) + (100% - var(--orbi-notch-h, 0px)) / 2);
+  translate: 0 -50%;
+  display: flex;
+  gap: 3px;
+}
+.orbi-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--orbi-text-3);
+}
+.orbi-dots i[data-state="working"] { background: var(--orbi-working); }
+.orbi-dots i[data-state="asking"],
+.orbi-dots i[data-state="question"] { background: var(--orbi-asking); }
+.orbi-dots i[data-state="done"] { background: var(--orbi-done); }
+.orbi-dots i[data-state="error"] { background: var(--orbi-error); }
+.orbi-face[data-tucked] .orbi-dots { opacity: 0; }
+
+.orbi-question {
+  margin: 0;
+  color: var(--orbi-text);
+  font-size: 12.5px;
+  line-height: 17px;
+}
+.orbi-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.orbi-option {
+  padding: 1px 8px;
+  border-radius: 9px;
+  background: rgba(236, 235, 228, 0.07);
+  box-shadow: inset 0 0 0 1px rgba(236, 235, 228, 0.1);
+  color: var(--orbi-text-2);
+  font-size: 11px;
+  line-height: 18px;
+}
+.orbi-card[data-mode="question"] { border-color: rgba(226, 173, 85, 0.55); }
+
+.orbi-sessions {
+  list-style: none;
+  margin: 3px 0 0;
+  padding: 7px 0 1px;
+  border-top: 1px solid rgba(236, 235, 228, 0.07);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.orbi-session {
+  display: grid;
+  grid-template-columns: 6px auto 1fr;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 16px;
+}
+.orbi-session-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--orbi-text-3);
+}
+.orbi-session[data-state="working"] .orbi-session-dot { background: var(--orbi-working); }
+.orbi-session[data-state="asking"] .orbi-session-dot,
+.orbi-session[data-state="question"] .orbi-session-dot { background: var(--orbi-asking); }
+.orbi-session[data-state="done"] .orbi-session-dot { background: var(--orbi-done); }
+.orbi-session[data-state="error"] .orbi-session-dot { background: var(--orbi-error); }
+.orbi-session-name { color: var(--orbi-text); font-weight: 600; }
+.orbi-session-meta {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--orbi-text-3);
+}
+.orbi-session-meta .orbi-chip { font-size: 10px; padding: 0 4px; }

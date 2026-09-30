@@ -8,7 +8,18 @@ set -eu
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 
+# Compiled-in source paths (panic messages) would otherwise carry the builder's
+# home folder, and with it their username. Rewrite it for the app and the hook.
+export RUSTFLAGS="--remap-path-prefix=$HOME=~ ${RUSTFLAGS:-}"
+
 pnpm tauri build --bundles app
+
+# Nothing from the builder's home may ship.
+APP_BIN="$ROOT/src-tauri/target/release/bundle/macos/Orbi.app/Contents/MacOS"
+if strings "$APP_BIN/orbi" "$APP_BIN/orbi-hook" | grep -q "$HOME"; then
+  echo "the build still contains $HOME — refusing to package" >&2
+  exit 1
+fi
 
 APP="$ROOT/src-tauri/target/release/bundle/macos/Orbi.app"
 [ -x "$APP/Contents/MacOS/orbi-hook" ] || { echo "orbi-hook missing from the bundle" >&2; exit 1; }

@@ -44,6 +44,30 @@ pub fn disconnect(id: &str, hook: &Path) -> Result<Integration, String> {
     disconnect_in(&Env::real(), id, hook)
 }
 
+/// What Connect would change, without changing anything.
+pub fn preview(id: &str, hook: &Path) -> Result<Preview, String> {
+    preview_in(&Env::real(), id, hook)
+}
+
+/// One line of a Connect preview: `op` is "+", "-", " " (context) or "…"
+/// (unchanged lines skipped).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DiffLine {
+    pub op: String,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Preview {
+    pub config_path: String,
+    /// Nothing would change: already connected and up to date.
+    pub unchanged: bool,
+    /// The file doesn't exist yet and would be created.
+    pub creates: bool,
+    pub lines: Vec<DiffLine>,
+}
+
 /// Re-point connected integrations at `hook` (app moved or updated). Also
 /// brings older Orbi entries up to the current set. Errors are ignored.
 pub fn repair(hook: &Path) {
@@ -364,6 +388,11 @@ fn wanted(kind: Kind, hook: &str) -> Vec<(&'static str, Option<&'static str>, Va
                 ("Notification", None, ev()),
                 ("Stop", None, ev()),
                 ("StopFailure", None, ev()),
+                // Sessions and sub-agents, so the face can list what's running.
+                ("SessionStart", None, ev()),
+                ("SessionEnd", None, ev()),
+                ("SubagentStart", None, ev()),
+                ("SubagentStop", None, ev()),
             ]
         }
         Kind::Codex => {
@@ -572,22 +601,147 @@ fn to_json_text(v: &Value, indent: &str) -> Result<String, String> {
 }
 
 fn edit_json(env: &Env, path: &Path, kind: Kind, f: impl FnOnce(&mut Value) -> Result<(), String>) -> Result<(), String> {
-    edit_text(env, path, |old| {
-        let mut v = parse_json(old)
-            .map_err(|e| format!("{} isn't valid JSON ({e}) \u{2014} Orbi won't touch it", tilde(env, path)))?;
-        if !v.is_object() {
-            return Err(format!("{} isn't a JSON object \u{2014} Orbi won't touch it", tilde(env, path)));
+    edit_text(env, path, |old| json_transform(env, path, kind, old, f))
+}
+
+/// The new text of a JSON config after `f` — shared by the real edit and the
+/// Connect preview, so the preview is exactly what gets written.
+fn json_transform(env: &Env, path: &Path, kind: Kind, old: &str, f: impl FnOnce(&mut Value) -> Result<(), String>) -> Result<String, String> {
+    let mut v = parse_json(old)
+        .map_err(|e| format!("{} isn't valid JSON ({e}) \u{2014} Orbi won't touch it", tilde(env, path)))?;
+    if !v.is_object() {
+        return Err(format!("{} isn't a JSON object \u{2014} Orbi won't touch it", tilde(env, path)));
+    }
+    let before = v.clone();
+    f(&mut v)?;
+    if v == before && !old.trim().is_empty() {
+        return Ok(old.to_string());
+    }
+    if kind == Kind::Cursor && old.trim().is_empty() && v == json!({}) {
+        return Ok(old.to_string());
+    }
+    to_json_text(&v, &detect_indent(old))
+}
+
+// ------------------------------------------------------------ Connect preview
+
+fn preview_in(env: &Env, id: &str, hook: &Path) -> Result<Preview, String> {
+    let s = spec(id)?;
+    if !hook.is_absolute() {
+        return Err("the hook path must be absolute".into());
+    }
+    let path = env.home.join(s.config);
+    let target = fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+    let (old, existed) = match fs::read(&target) {
+        Ok(b) => (String::from_utf8(b).map_err(|_| format!("{} isn't UTF-8 text \u{2014} Orbi won't touch it", tilde(env, &path)))?, true),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => (String::new(), false),
+        Err(e) => return Err(format!("can't read {}: {e}", tilde(env, &path))),
+    };
+    let hook = hook.to_string_lossy();
+    // The same transforms `connect_in` applies.
+    let new = match s.kind {
+        Kind::OpenCode => {
+            let js = opencode_plugin(&hook);
+            if existed && old != js && !old.contains(PLUGIN_MARKER) {
+                return Err(format!("{} exists and wasn't written by Orbi \u{2014} not touching it", tilde(env, &path)));
+            }
+            js
         }
-        let before = v.clone();
-        f(&mut v)?;
-        if v == before && !old.trim().is_empty() {
-            return Ok(old.to_string());
-        }
-        if kind == Kind::Cursor && old.trim().is_empty() && v == json!({}) {
-            return Ok(old.to_string());
-        }
-        to_json_text(&v, &detect_indent(old))
+        Kind::Hermes => yaml_connect(&old, &hermes_entries(&hook))?,
+        kind => json_transform(env, &path, kind, &old, |root| json_connect(root, kind, &hook))?,
+    };
+    Ok(Preview {
+        config_path: tilde(env, &path),
+        unchanged: new == old,
+        creates: !existed,
+        lines: if new == old { Vec::new() } else { diff_lines(&old, &new) },
     })
+}
+
+/// Lines of context kept around each change.
+const CONTEXT: usize = 2;
+/// Above this many lines per side, skip the line diff and show the result's
+/// changed region only (configs are never this big in practice).
+const MAX_DIFF_LINES: usize = 3000;
+
+/// A minimal line diff (LCS), unchanged runs collapsed to a few lines of
+/// context. Context and removed lines that look like they hold a secret are
+/// masked: the preview only needs to show what Orbi adds.
+fn diff_lines(old: &str, new: &str) -> Vec<DiffLine> {
+    let a: Vec<&str> = old.lines().collect();
+    let b: Vec<&str> = new.lines().collect();
+    let mut ops: Vec<(char, &str)> = Vec::new();
+    if a.len() > MAX_DIFF_LINES || b.len() > MAX_DIFF_LINES {
+        ops.extend(b.iter().map(|l| ('+', *l)));
+    } else {
+        let (n, m) = (a.len(), b.len());
+        let mut dp = vec![vec![0u32; m + 1]; n + 1];
+        for i in (0..n).rev() {
+            for j in (0..m).rev() {
+                dp[i][j] = if a[i] == b[j] { dp[i + 1][j + 1] + 1 } else { dp[i + 1][j].max(dp[i][j + 1]) };
+            }
+        }
+        let (mut i, mut j) = (0, 0);
+        while i < n && j < m {
+            if a[i] == b[j] {
+                ops.push((' ', a[i]));
+                i += 1;
+                j += 1;
+            } else if dp[i + 1][j] >= dp[i][j + 1] {
+                ops.push(('-', a[i]));
+                i += 1;
+            } else {
+                ops.push(('+', b[j]));
+                j += 1;
+            }
+        }
+        ops.extend(a[i..].iter().map(|l| ('-', *l)));
+        ops.extend(b[j..].iter().map(|l| ('+', *l)));
+    }
+    // Keep changes plus CONTEXT lines either side; mark the gaps.
+    let keep: Vec<bool> = (0..ops.len())
+        .map(|k| {
+            let lo = k.saturating_sub(CONTEXT);
+            let hi = (k + CONTEXT + 1).min(ops.len());
+            ops[lo..hi].iter().any(|(op, _)| *op != ' ')
+        })
+        .collect();
+    let mut out = Vec::new();
+    let mut gap = false;
+    for (k, (op, text)) in ops.iter().enumerate() {
+        if !keep[k] {
+            gap = true;
+            continue;
+        }
+        if gap {
+            out.push(DiffLine { op: "…".into(), text: String::new() });
+            gap = false;
+        }
+        let shown = if *op == '+' { text.to_string() } else { mask_secret(text) };
+        let shown: String = shown.chars().take(300).collect();
+        out.push(DiffLine { op: op.to_string(), text: shown });
+    }
+    if gap {
+        out.push(DiffLine { op: "…".into(), text: String::new() });
+    }
+    out
+}
+
+/// `"apiKey": "sk-…"` → `"apiKey": "••••••"`. Anything whose key mentions a
+/// secret word keeps its key and loses its value.
+fn mask_secret(line: &str) -> String {
+    const WORDS: &[&str] = &["key", "token", "secret", "password", "passwd", "auth", "credential", "bearer", "cookie", "session"];
+    let Some(cut) = line.find([':', '=']) else { return line.to_string() };
+    let key = line[..cut].to_ascii_lowercase();
+    if !WORDS.iter().any(|w| key.contains(w)) {
+        return line.to_string();
+    }
+    let value = line[cut + 1..].trim();
+    if value.is_empty() || value == "{" || value == "[" {
+        return line.to_string();
+    }
+    let trail = if value.ends_with(',') { "," } else { "" };
+    format!("{} \"\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\"{}", &line[..=cut], trail)
 }
 
 // ------------------------------------------------------------ file plumbing
@@ -1259,5 +1413,61 @@ mod tests {
         let t = yaml_connect("", &hermes_entries(HOOK)).unwrap();
         assert!(t.starts_with("hooks:\n  pre_llm_call:\n"));
         assert_eq!(yaml_remove(&t).0.trim(), "");
+    }
+
+    #[test]
+    fn preview_shows_exactly_what_connect_writes_and_writes_nothing() {
+        let home = temp_home();
+        let env = Env::with_home(&home);
+        let hook = Path::new("/Applications/Orbi.app/Contents/MacOS/orbi-hook");
+        let cfg = home.join(".claude/settings.json");
+        fs::create_dir_all(cfg.parent().unwrap()).unwrap();
+        fs::write(&cfg, "{\n  \"env\": {\n    \"ANTHROPIC_API_KEY\": \"sk-secret-123\"\n  },\n  \"model\": \"opus\"\n}\n").unwrap();
+        let before = fs::read_to_string(&cfg).unwrap();
+
+        let p = preview_in(&env, "claude-code", hook).unwrap();
+        assert!(!p.unchanged && !p.creates);
+        assert_eq!(fs::read_to_string(&cfg).unwrap(), before, "preview must not write");
+        let text: String = p.lines.iter().map(|l| format!("{}{}\n", l.op, l.text)).collect();
+        assert!(text.contains("SessionStart") && text.contains("PermissionRequest"));
+        assert!(!text.contains("sk-secret-123"), "secrets in context lines are masked:\n{text}");
+        assert!(p.lines.iter().all(|l| l.op != "-" || !l.text.contains("sk-")));
+
+        connect_in(&env, "claude-code", hook).unwrap();
+        let after = preview_in(&env, "claude-code", hook).unwrap();
+        assert!(after.unchanged && after.lines.is_empty(), "connected and current → nothing to change");
+        // The secret is still there, untouched.
+        assert!(fs::read_to_string(&cfg).unwrap().contains("sk-secret-123"));
+    }
+
+    #[test]
+    fn preview_of_a_new_file_and_of_a_foreign_plugin() {
+        let home = temp_home();
+        let env = Env::with_home(&home);
+        let hook = Path::new("/Applications/Orbi.app/Contents/MacOS/orbi-hook");
+        let p = preview_in(&env, "claude-code", hook).unwrap();
+        assert!(p.creates && p.lines.iter().all(|l| l.op == "+"));
+        assert!(!home.join(".claude/settings.json").exists());
+
+        let plugin = home.join(".config/opencode/plugins/orbi.js");
+        fs::create_dir_all(plugin.parent().unwrap()).unwrap();
+        fs::write(&plugin, "// someone else's plugin\n").unwrap();
+        assert!(preview_in(&env, "opencode", hook).is_err());
+        assert!(preview_in(&env, "nope", hook).is_err());
+        assert!(preview_in(&env, "claude-code", Path::new("relative/hook")).is_err());
+    }
+
+    #[test]
+    fn secrets_are_masked_and_diffs_collapse() {
+        assert_eq!(mask_secret(r#"    "GITHUB_TOKEN": "ghp_abc","#), "    \"GITHUB_TOKEN\": \"\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\",");
+        assert_eq!(mask_secret(r#"  "model": "opus""#), r#"  "model": "opus""#);
+        assert_eq!(mask_secret(r#"  "auth": {"#), r#"  "auth": {"#);
+        let old: String = (0..40).map(|i| format!("line {i}\n")).collect();
+        let new = old.replace("line 20\n", "line 20\nadded\n");
+        let d = diff_lines(&old, &new);
+        assert_eq!(d.iter().filter(|l| l.op == "+").count(), 1);
+        assert_eq!(d.iter().filter(|l| l.op == " ").count(), 4);
+        assert_eq!(d.first().unwrap().op, "…");
+        assert_eq!(d.last().unwrap().op, "…");
     }
 }

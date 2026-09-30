@@ -31,6 +31,12 @@ without leaving what you're doing.
   <img src="brand/readme/orbi-demo.gif" width="760" alt="A MacBook screen recording: Claude Code asks to run npm test, Orbi shows it in the notch, and ⌃⌥A approves it">
 </p>
 
+**New in 0.2:** Orbi fits your real notch and hangs just below the camera,
+tucks away when idle, lists your running sessions by project, shows Claude's
+questions, jumps to the exact Terminal/iTerm tab, and shows exactly what Connect
+will change before it changes anything. Size, width, height and position are
+yours to set in Settings → Appearance.
+
 | key | does |
 | --- | --- |
 | `⌃⌥A` | allow the request on screen |

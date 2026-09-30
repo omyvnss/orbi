@@ -82,7 +82,54 @@ struct Pending {
     /// session can withdraw a prompt answered in the terminal.
     session: Option<String>,
     app_bundle: Option<String>,
+    term: Option<Term>,
     tx: mpsc::Sender<(Decision, &'static str)>,
+}
+
+/// Which terminal tab an agent runs in, as reported by orbi-hook and checked
+/// here character by character: it ends up as an argument to `osascript`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Term {
+    program: String,
+    /// iTerm2 session UUID.
+    iterm: Option<String>,
+    /// Apple Terminal tty, `/dev/ttysNNN`.
+    tty: Option<String>,
+}
+
+/// A question the agent asked (Claude Code `AskUserQuestion`). Display only:
+/// Orbi never answers it — the user does, in the terminal.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Question {
+    text: String,
+    options: Vec<String>,
+    /// How many further questions follow this one.
+    more: u64,
+}
+
+/// One running agent session, named after its project folder.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionView {
+    key: String,
+    agent: String,
+    agent_label: String,
+    project: String,
+    /// ready | working | asking | question | done | error
+    state: String,
+    summary: String,
+    subagents: u32,
+    question: Option<Question>,
+    updated_at: u64,
+}
+
+struct Session {
+    view: SessionView,
+    agent: String,
+    id: String,
+    term: Option<Term>,
+    app_bundle: Option<String>,
 }
 
 #[derive(Serialize, Clone)]
@@ -96,6 +143,8 @@ pub struct Activity {
     at: u64,
     #[serde(skip)]
     app_bundle: Option<String>,
+    #[serde(skip)]
+    term: Option<Term>,
 }
 
 #[derive(Serialize, Clone)]
@@ -105,6 +154,7 @@ pub struct Snapshot {
     timeout_secs: u64,
     queue: Vec<PendingView>,
     activity: Option<Activity>,
+    sessions: Vec<SessionView>,
 }
 
 #[derive(Default)]
@@ -116,6 +166,9 @@ pub struct Core {
     timeout_secs: u64,
     /// The most recent app any agent reported running in, for ⌃⌥J.
     last_app_bundle: Option<String>,
+    last_term: Option<Term>,
+    /// Running sessions, newest last.
+    sessions: Vec<Session>,
     /// The request at the front of the queue and when it got there. ⌃⌥A
     /// only approves a front that has been on screen long enough to read.
     front_id: Option<u64>,
@@ -150,12 +203,43 @@ fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
+/// Most sessions shown at once.
+const MAX_SESSIONS: usize = 8;
+/// A finished or failed session lingers this long, then leaves the face.
+const SETTLED_TTL_MS: u64 = 5 * 60 * 1000;
+/// Anything silent this long is presumed gone (terminal closed, crash).
+const QUIET_TTL_MS: u64 = 30 * 60 * 1000;
+
+fn prune_sessions(core: &mut Core, now: u64) {
+    core.sessions.retain(|s| {
+        let age = now.saturating_sub(s.view.updated_at);
+        let settled = matches!(s.view.state.as_str(), "done" | "error");
+        age < QUIET_TTL_MS && !(settled && age >= SETTLED_TTL_MS)
+    });
+}
+
 fn snapshot(core: &Core) -> Snapshot {
+    let mut sessions: Vec<SessionView> = core
+        .sessions
+        .iter()
+        .rev()
+        .take(MAX_SESSIONS)
+        .map(|s| {
+            let mut v = s.view.clone();
+            // A permission prompt from this session outranks everything else.
+            if core.queue.iter().any(|p| p.view.agent == s.agent && p.session.as_deref() == Some(s.id.as_str())) {
+                v.state = "asking".into();
+            }
+            v
+        })
+        .collect();
+    sessions.sort_by_key(|s| std::cmp::Reverse(s.updated_at));
     Snapshot {
         paused: core.paused,
         timeout_secs: core.timeout_secs,
         queue: core.queue.iter().map(|p| p.view.clone()).collect(),
         activity: core.activity.clone(),
+        sessions,
     }
 }
 
@@ -164,6 +248,7 @@ fn emit_state(app: &AppHandle) {
         let state = app.state::<CoreState>();
         let mut core = state.0.lock().unwrap();
         sync_front(&mut core);
+        prune_sessions(&mut core, now_ms());
         snapshot(&core)
     };
     let _ = app.emit("orbi-state", snap);
@@ -226,19 +311,93 @@ pub fn set_paused(app: &AppHandle, paused: bool) {
 /// ⌃⌥J — brings the app the relevant agent runs in to the front: the oldest
 /// pending request's, else the latest activity's, else the last one seen.
 pub fn jump_to_agent(app: &AppHandle) {
-    let bundle = {
+    let (bundle, term) = {
         let state = app.state::<CoreState>();
         let core = state.0.lock().unwrap();
-        core.queue
-            .front()
-            .and_then(|p| p.app_bundle.clone())
-            .or_else(|| core.activity.as_ref().and_then(|a| a.app_bundle.clone()))
-            .or_else(|| core.last_app_bundle.clone())
+        // The request on screen, else a session waiting on a question, else
+        // whatever was active last.
+        let questioned = core.sessions.iter().rev().find(|s| s.view.question.is_some());
+        if let Some(p) = core.queue.front() {
+            (p.app_bundle.clone().or_else(|| core.last_app_bundle.clone()), p.term.clone())
+        } else if let Some(s) = questioned {
+            (s.app_bundle.clone().or_else(|| core.last_app_bundle.clone()), s.term.clone())
+        } else if let Some(a) = core.activity.as_ref() {
+            (a.app_bundle.clone().or_else(|| core.last_app_bundle.clone()), a.term.clone().or_else(|| core.last_term.clone()))
+        } else {
+            (core.last_app_bundle.clone(), core.last_term.clone())
+        }
     };
-    if let Some(bundle) = bundle {
-        // Validated at intake to [A-Za-z0-9.-]; passed as an argument, never
-        // through a shell.
-        let _ = Command::new("/usr/bin/open").arg("-b").arg(bundle).spawn();
+    // osascript can wait on the one-time Automation prompt: never on this thread.
+    std::thread::spawn(move || {
+        if term.as_ref().is_some_and(focus_tab) {
+            return;
+        }
+        if let Some(bundle) = bundle {
+            // Validated at intake to [A-Za-z0-9.-]; passed as an argument, never
+            // through a shell.
+            let _ = Command::new("/usr/bin/open").arg("-b").arg(bundle).spawn();
+        }
+    });
+}
+
+const TERMINAL_SCRIPT: &[&str] = &[
+    "on run argv",
+    "set wanted to item 1 of argv",
+    "tell application \"Terminal\"",
+    "repeat with w in windows",
+    "repeat with t in tabs of w",
+    "if tty of t is wanted then",
+    "set selected of t to true",
+    "set index of w to 1",
+    "activate",
+    "return \"ok\"",
+    "end if",
+    "end repeat",
+    "end repeat",
+    "end tell",
+    "return \"missing\"",
+    "end run",
+];
+
+const ITERM_SCRIPT: &[&str] = &[
+    "on run argv",
+    "set wanted to item 1 of argv",
+    "tell application \"iTerm2\"",
+    "repeat with w in windows",
+    "repeat with t in tabs of w",
+    "repeat with s in sessions of t",
+    "if unique id of s is wanted then",
+    "select w",
+    "select t",
+    "select s",
+    "activate",
+    "return \"ok\"",
+    "end if",
+    "end repeat",
+    "end repeat",
+    "end repeat",
+    "end tell",
+    "return \"missing\"",
+    "end run",
+];
+
+/// Brings the exact terminal tab forward. The tab id travels as an `argv`
+/// item, never inside the script text. False when it can't (no permission,
+/// tab closed, other terminal) so the caller falls back to opening the app.
+fn focus_tab(term: &Term) -> bool {
+    let (script, arg) = match (term.program.as_str(), &term.iterm, &term.tty) {
+        ("iTerm.app", Some(id), _) => (ITERM_SCRIPT, id),
+        ("Apple_Terminal", _, Some(tty)) => (TERMINAL_SCRIPT, tty),
+        _ => return false,
+    };
+    let mut cmd = Command::new("/usr/bin/osascript");
+    for line in script {
+        cmd.arg("-e").arg(line);
+    }
+    cmd.arg(arg);
+    match cmd.output() {
+        Ok(out) => out.status.success() && String::from_utf8_lossy(&out.stdout).trim() == "ok",
+        Err(_) => false,
     }
 }
 
@@ -569,43 +728,199 @@ fn bundle_field(body: &Value) -> Option<String> {
     }).map(str::to_string)
 }
 
-fn handle_event(app: &AppHandle, body: &Value) {
+/// A terminal tab reference, or nothing. Every part is checked against a
+/// strict pattern because it is later handed to `osascript` as an argument.
+fn term_field(body: &Value) -> Option<Term> {
+    let t = body.get("term")?;
+    let program = t.get("program")?.as_str()?;
+    if program.is_empty() || program.len() > 40 || !program.bytes().all(|c| c.is_ascii_alphanumeric() || b"._-".contains(&c)) {
+        return None;
+    }
+    // ITERM_SESSION_ID is "w0t1p0:<UUID>"; keep the UUID.
+    let iterm = t
+        .get("iterm")
+        .and_then(Value::as_str)
+        .map(|v| v.rsplit(':').next().unwrap_or(""))
+        .filter(|id| id.len() == 36 && id.bytes().all(|c| c.is_ascii_hexdigit() || c == b'-'))
+        .map(str::to_string);
+    let tty = t
+        .get("tty")
+        .and_then(Value::as_str)
+        .filter(|v| {
+            v.strip_prefix("/dev/ttys")
+                .is_some_and(|n| !n.is_empty() && n.len() <= 4 && n.bytes().all(|c| c.is_ascii_digit()))
+        })
+        .map(str::to_string);
+    Some(Term { program: program.to_string(), iterm, tty })
+}
+
+fn question_field(body: &Value) -> Option<Question> {
+    let q = body.get("question")?;
+    let text = str_field(q, "text", 200)?;
+    let options: Vec<String> = q
+        .get("options")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().take(4).filter_map(Value::as_str).map(|o| clip(o.trim(), 40)).filter(|o| !o.is_empty()).collect())
+        .unwrap_or_default();
+    let more = q.get("more").and_then(Value::as_u64).unwrap_or(0).min(9);
+    Some(Question { text: explain::visible(&text), options: options.iter().map(|o| explain::visible(o)).collect(), more })
+}
+
+/// The last folder of a working directory: "~/code/orbi" → "orbi".
+fn project_of(cwd: &str) -> String {
+    let name = cwd.trim_end_matches('/').rsplit('/').next().unwrap_or("");
+    explain::visible(&clip(name, 40))
+}
+
+/// The session for `(agent, id)`, created if new. Oldest sessions make room.
+fn touch_session<'a>(core: &'a mut Core, agent: &str, id: &str, cwd: Option<&str>, now: u64) -> &'a mut Session {
+    if let Some(i) = core.sessions.iter().position(|s| s.agent == agent && s.id == id) {
+        // Newest last, so the face lists the most recent first.
+        let s = core.sessions.remove(i);
+        core.sessions.push(s);
+    } else {
+        if core.sessions.len() >= MAX_SESSIONS * 2 {
+            core.sessions.remove(0);
+        }
+        core.sessions.push(Session {
+            view: SessionView {
+                key: format!("{agent}:{}", clip(id, 60)),
+                agent: agent.to_string(),
+                agent_label: explain::agent_label(agent),
+                project: String::new(),
+                state: "ready".into(),
+                summary: String::new(),
+                subagents: 0,
+                question: None,
+                updated_at: now,
+            },
+            agent: agent.to_string(),
+            id: id.to_string(),
+            term: None,
+            app_bundle: None,
+        });
+    }
+    let s = core.sessions.last_mut().expect("just pushed");
+    if let Some(c) = cwd.filter(|c| !c.is_empty()) {
+        s.view.project = project_of(c);
+    }
+    if s.view.project.is_empty() {
+        s.view.project = s.view.agent_label.clone();
+    }
+    s.view.updated_at = now;
+    s
+}
+
+/// Applies one `/event` to Orbi's state. Returns the prompts it proved were
+/// already answered elsewhere, for the caller to release. Pure, so it's tested
+/// without a running app.
+fn apply_event(core: &mut Core, body: &Value, now: u64) -> Vec<Pending> {
     let agent = str_field(body, "agent", 40).unwrap_or_else(|| "agent".into());
+    let app_bundle = bundle_field(body);
+    let term = term_field(body);
+    let session = str_field(body, "session", 200);
+    let cwd = str_field(body, "cwd", 1000);
+    if app_bundle.is_some() {
+        core.last_app_bundle = app_bundle.clone();
+    }
+    if term.is_some() {
+        core.last_term = term.clone();
+    }
+    let release = |core: &mut Core, agent: &str, session: &Option<String>| -> Vec<Pending> {
+        let (gone, keep): (VecDeque<Pending>, VecDeque<Pending>) =
+            core.queue.drain(..).partition(|p| p.view.agent == agent && p.session == *session);
+        core.queue = keep;
+        gone.into_iter().collect()
+    };
+
+    // Session lifecycle: bookkeeping only, the face's activity is untouched.
+    if let Some(phase) = body.get("phase").and_then(Value::as_str) {
+        let Some(id) = session.clone() else { return Vec::new() };
+        let mut released = Vec::new();
+        match phase {
+            "start" => {
+                let s = touch_session(core, &agent, &id, cwd.as_deref(), now);
+                if matches!(s.view.state.as_str(), "done" | "error") {
+                    s.view.state = "ready".into();
+                    s.view.summary.clear();
+                }
+                s.view.question = None;
+                if term.is_some() {
+                    s.term = term;
+                }
+                if app_bundle.is_some() {
+                    s.app_bundle = app_bundle;
+                }
+            }
+            "end" => {
+                core.sessions.retain(|s| !(s.agent == agent && s.id == id));
+                // The session is gone, so nothing can still be waiting on it.
+                released = release(core, &agent, &session);
+            }
+            "subagent_start" | "subagent_stop" => {
+                let kind = str_field(body, "summary", 40).map(|k| explain::visible(&k));
+                let s = touch_session(core, &agent, &id, cwd.as_deref(), now);
+                if phase == "subagent_start" {
+                    s.view.subagents = (s.view.subagents + 1).min(99);
+                    s.view.state = "working".into();
+                    s.view.summary = match kind {
+                        Some(k) => format!("running a sub-agent: {k}"),
+                        None => "running a sub-agent".into(),
+                    };
+                } else {
+                    s.view.subagents = s.view.subagents.saturating_sub(1);
+                }
+            }
+            _ => {}
+        }
+        return released;
+    }
+
     let kind = match body.get("kind").and_then(Value::as_str) {
         Some(k @ ("working" | "done" | "error")) => k.to_string(),
-        _ => return,
+        _ => return Vec::new(),
     };
-    let app_bundle = bundle_field(body);
-    let session = str_field(body, "session", 200);
     let settles = kind != "working" || body.get("settles").and_then(Value::as_bool) == Some(true);
-    let released: Vec<Pending> = {
+    // The same session moved on, so anything it was waiting on was answered
+    // in the terminal. Only matches a known session: without one, an event
+    // can't prove which prompt it belongs to.
+    let released = if settles && session.is_some() { release(core, &agent, &session) } else { Vec::new() };
+    let summary = explain::visible(&str_field(body, "summary", 300).unwrap_or_default());
+    let question = question_field(body);
+
+    if let Some(id) = session.as_deref() {
+        let s = touch_session(core, &agent, id, cwd.as_deref(), now);
+        s.view.state = if question.is_some() { "question".into() } else { kind.clone() };
+        s.view.summary = summary.clone();
+        s.view.question = question;
+        if kind != "working" {
+            s.view.subagents = 0;
+        }
+        if term.is_some() {
+            s.term = term.clone();
+        }
+        if app_bundle.is_some() {
+            s.app_bundle = app_bundle.clone();
+        }
+    }
+    core.activity = Some(Activity {
+        agent_label: explain::agent_label(&agent),
+        agent,
+        kind,
+        summary,
+        detail: str_field(body, "detail", 4000).map(|d| explain::visible(&d)),
+        at: now,
+        app_bundle,
+        term,
+    });
+    released
+}
+
+fn handle_event(app: &AppHandle, body: &Value) {
+    let released = {
         let state = app.state::<CoreState>();
         let mut core = state.0.lock().unwrap();
-        if app_bundle.is_some() {
-            core.last_app_bundle = app_bundle.clone();
-        }
-        // The same session moved on, so anything it was waiting on was
-        // answered in the terminal. Only matches a known session: without
-        // one, an event can't prove which prompt it belongs to.
-        let mut released = Vec::new();
-        if settles && session.is_some() {
-            let (gone, keep): (VecDeque<Pending>, VecDeque<Pending>) = core
-                .queue
-                .drain(..)
-                .partition(|p| p.view.agent == agent && p.session == session);
-            core.queue = keep;
-            released.extend(gone);
-        }
-        core.activity = Some(Activity {
-            agent_label: explain::agent_label(&agent),
-            agent,
-            kind,
-            summary: explain::visible(&str_field(body, "summary", 300).unwrap_or_default()),
-            detail: str_field(body, "detail", 4000).map(|d| explain::visible(&d)),
-            at: now_ms(),
-            app_bundle,
-        });
-        released
+        apply_event(&mut core, body, now_ms())
     };
     for p in released {
         let _ = p.tx.send((Decision::Ask, "Answered in the terminal"));
@@ -626,6 +941,7 @@ fn handle_ask(
     let cwd = str_field(body, "cwd", 1000).unwrap_or_default();
     let input = body.get("input").cloned().unwrap_or(Value::Null);
     let app_bundle = bundle_field(body);
+    let term = term_field(body);
     let session = str_field(body, "session", 200);
     let explained = explain::explain(&tool, &input, &cwd);
     let (rules_line, rules_detail) = (explained.line.clone(), explained.detail.clone());
@@ -640,6 +956,19 @@ fn handle_ask(
         }
         if app_bundle.is_some() {
             core.last_app_bundle = app_bundle.clone();
+        }
+        if term.is_some() {
+            core.last_term = term.clone();
+        }
+        if let Some(id) = session.as_deref() {
+            let s = touch_session(&mut core, &agent, id, Some(cwd.as_str()), now_ms());
+            s.view.question = None;
+            if term.is_some() {
+                s.term = term.clone();
+            }
+            if app_bundle.is_some() {
+                s.app_bundle = app_bundle.clone();
+            }
         }
         core.next_id += 1;
         let id = core.next_id;
@@ -658,6 +987,7 @@ fn handle_ask(
             },
             session,
             app_bundle,
+            term,
             tx,
         });
         (id, label, Duration::from_secs(core.timeout_secs))
@@ -762,6 +1092,7 @@ mod tests {
             },
             session: None,
             app_bundle: None,
+            term: None,
             tx,
         });
         sync_front(&mut core);
@@ -779,5 +1110,107 @@ mod tests {
         assert!(is_valid_token(&"a".repeat(64)));
         assert!(!is_valid_token(&"g".repeat(64)));
         assert!(!is_valid_token("abc"));
+    }
+
+    #[test]
+    fn terminal_tabs_are_validated() {
+        let t = |v: Value| term_field(&json!({ "term": v }));
+        let uuid = "2C7A5E0B-1D3F-4A6B-9C8D-0E1F2A3B4C5D";
+        assert_eq!(
+            t(json!({"program": "iTerm.app", "iterm": format!("w0t1p0:{uuid}")})),
+            Some(Term { program: "iTerm.app".into(), iterm: Some(uuid.into()), tty: None })
+        );
+        assert_eq!(t(json!({"program": "Apple_Terminal", "tty": "/dev/ttys004"})).unwrap().tty.as_deref(), Some("/dev/ttys004"));
+        for bad_tty in ["/dev/ttys", "/dev/ttys12345", "/dev/tty.x", "ttys004", "/dev/ttys00\"; x"] {
+            assert_eq!(t(json!({"program": "Apple_Terminal", "tty": bad_tty})).unwrap().tty, None, "{bad_tty}");
+        }
+        assert_eq!(t(json!({"program": "iTerm.app", "iterm": "w0t1p0:\" & do shell script \"x"})).unwrap().iterm, None);
+        assert_eq!(t(json!({"program": "a b"})), None);
+        assert_eq!(t(json!({"program": ""})), None);
+        assert_eq!(term_field(&json!({})), None);
+    }
+
+    #[test]
+    fn sessions_track_lifecycle_subagents_and_questions() {
+        let mut core = Core::default();
+        let ev = |v: Value| v;
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "session", "phase": "start", "session": "s1", "cwd": "/w/orbi"})), 1);
+        assert_eq!(core.sessions.len(), 1);
+        assert_eq!((core.sessions[0].view.project.as_str(), core.sessions[0].view.state.as_str()), ("orbi", "ready"));
+        // Lifecycle never changes the face's activity.
+        assert!(core.activity.is_none());
+
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "session", "phase": "subagent_start", "session": "s1", "summary": "Explore"})), 2);
+        assert_eq!(core.sessions[0].view.subagents, 1);
+        assert_eq!(core.sessions[0].view.summary, "running a sub-agent: Explore");
+
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "working", "summary": "has a question for you", "session": "s1",
+            "question": {"text": "Which DB?", "options": ["Postgres", "SQLite"], "more": 0}})), 3);
+        let s = &core.sessions[0].view;
+        assert_eq!(s.state, "question");
+        assert_eq!(s.question.as_ref().unwrap().options, vec!["Postgres".to_string(), "SQLite".to_string()]);
+
+        // The next event from that session clears the question.
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "working", "summary": "running `ls`", "session": "s1"})), 4);
+        assert!(core.sessions[0].view.question.is_none());
+
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "done", "summary": "finished", "session": "s1"})), 5);
+        assert_eq!((core.sessions[0].view.state.as_str(), core.sessions[0].view.subagents), ("done", 0));
+
+        // A second project; newest first in the snapshot.
+        apply_event(&mut core, &ev(json!({"agent": "codex", "kind": "working", "summary": "x", "session": "t9", "cwd": "/w/web"})), 6);
+        let snap = snapshot(&core);
+        assert_eq!(snap.sessions.iter().map(|s| s.project.as_str()).collect::<Vec<_>>(), vec!["web", "orbi"]);
+
+        // Settled sessions leave after a while; quiet ones after longer.
+        prune_sessions(&mut core, 5 + SETTLED_TTL_MS);
+        assert_eq!(core.sessions.len(), 1);
+        prune_sessions(&mut core, 6 + QUIET_TTL_MS);
+        assert!(core.sessions.is_empty());
+
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "session", "phase": "start", "session": "s2"})), 7);
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "session", "phase": "end", "session": "s2"})), 8);
+        assert!(core.sessions.is_empty());
+        // No session id: lifecycle events are ignored.
+        apply_event(&mut core, &ev(json!({"agent": "claude-code", "kind": "session", "phase": "start"})), 9);
+        assert!(core.sessions.is_empty());
+    }
+
+    #[test]
+    fn session_end_releases_its_prompts_to_the_terminal() {
+        let mut core = Core::default();
+        let (tx, rx) = mpsc::channel();
+        core.queue.push_back(Pending {
+            view: PendingView {
+                id: 1,
+                agent: "claude-code".into(),
+                agent_label: "Claude Code".into(),
+                tool: "Bash".into(),
+                line: String::new(),
+                detail: String::new(),
+                warnings: vec![],
+                cwd: String::new(),
+                created_at: 0,
+            },
+            session: Some("s1".into()),
+            app_bundle: None,
+            term: None,
+            tx,
+        });
+        let released = apply_event(&mut core, &json!({"agent": "claude-code", "kind": "session", "phase": "end", "session": "s1"}), 1);
+        assert_eq!(released.len(), 1);
+        assert!(core.queue.is_empty());
+        drop(rx);
+    }
+
+    #[test]
+    fn projects_and_questions_are_bounded() {
+        assert_eq!(project_of("/Users/x/code/orbi/"), "orbi");
+        assert_eq!(project_of(""), "");
+        let q = question_field(&json!({"question": {"text": "  ", "options": []}}));
+        assert!(q.is_none());
+        let long: Vec<String> = (0..10).map(|i| format!("opt{i}")).collect();
+        let q = question_field(&json!({"question": {"text": "Pick", "options": long, "more": 99}})).unwrap();
+        assert_eq!((q.options.len(), q.more), (4, 9));
     }
 }

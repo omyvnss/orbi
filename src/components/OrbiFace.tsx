@@ -1,5 +1,5 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useId, type CSSProperties } from "react";
+import { useId, useRef, useState, type CSSProperties } from "react";
 import { GAZE_TRAVEL, SPRING, SPRING_MOMENTUM, FADE_ONLY } from "../lib/motion.js";
 import type { OrbiState } from "../lib/faceState.js";
 
@@ -103,6 +103,13 @@ export function OrbiFace({
   count = 0,
   gaze,
   layoutVars,
+  size = 1,
+  length = 1,
+  height = 1,
+  floating = false,
+  notch = null,
+  tucked = false,
+  sessions = [],
   className = "",
 }: {
   state: OrbiState;
@@ -112,6 +119,20 @@ export function OrbiFace({
   /** −1..1 from centre. Only for static previews; the live widget omits it. */
   gaze?: { x: number; y: number };
   layoutVars?: CSSProperties;
+  /** Overall size, 1 = default (Settings → Appearance). */
+  size?: number;
+  /** Pill width multiplier, 1 = default. */
+  length?: number;
+  /** Pill height multiplier (hangs further below the camera), 1 = default. */
+  height?: number;
+  /** Placed away from the top edge: round all four corners. */
+  floating?: boolean;
+  /** The Mac's camera housing, in points. When docked, Orbi hangs below it. */
+  notch?: { w: number; h: number } | null;
+  /** Nothing to show: shrink back into the notch (a hairline without one). */
+  tucked?: boolean;
+  /** States of the running sessions; with two or more, a dot each. */
+  sessions?: string[];
   className?: string;
 }) {
   const reduce = useReducedMotion() ?? false;
@@ -120,19 +141,47 @@ export function OrbiFace({
   const shape = eyeShape(state, paused);
   const behind = Math.max(0, count - 1);
 
+  // Docked under a real notch: the top of the pill sits behind the camera
+  // housing (black on black), so the eyes live in the part below it and the
+  // pill is always at least as wide as the notch.
+  const docked = !!notch && !floating;
+  const notchH = docked ? notch!.h / size : 0;
+  const minW = docked ? notch!.w / size + 28 : 0;
+  const w = tucked ? (docked ? notch!.w / size : 60) : Math.max(W * length, minW) + (asking ? 16 : 0);
+  const h = tucked ? (docked ? notchH : 6) : notchH + H * height;
+
+  // A poke squishes it; three in quick succession make it dizzy.
+  // Each dizzy spell adds two more turns, so the eyes never spin backwards.
+  const [spins, setSpins] = useState(0);
+  const pokes = useRef<number[]>([]);
+  const poke = () => {
+    const now = Date.now();
+    pokes.current = [...pokes.current.filter((t) => now - t < 1500), now];
+    if (pokes.current.length >= 3) {
+      pokes.current = [];
+      setSpins((n) => n + 1);
+    }
+  };
+
   return (
     <motion.div
       className={`orbi-face ${className}`}
       data-state={paused ? "paused" : state}
+      data-floating={floating || undefined}
+      data-docked={docked || undefined}
+      data-tucked={tucked || undefined}
       role="img"
       aria-label={paused ? "Orbi is paused" : LABELS[state]}
       initial={false}
       // Widens a touch when it needs you, like the island making room.
-      animate={{ width: asking ? W + 16 : W, opacity: paused ? 0.55 : 1 }}
+      animate={{ width: w, height: h, opacity: paused ? 0.55 : 1 }}
       transition={reduce ? FADE_ONLY : SPRING_MOMENTUM}
+      whileTap={reduce ? undefined : { scaleX: 1.06, scaleY: 0.9 }}
+      onClick={poke}
       style={
         {
-          height: H,
+          zoom: size,
+          "--orbi-notch-h": `${notchH}px`,
           ...layoutVars,
           ...(gaze
             ? {
@@ -159,14 +208,22 @@ export function OrbiFace({
             <motion.g
               className="orbi-eyes-pose"
               initial={false}
-              animate={{ scale: asking ? 1.2 : 1 }}
-              transition={reduce ? FADE_ONLY : SPRING}
+              style={{ transformBox: "view-box", transformOrigin: `${CX}px ${CY}px` }}
+              animate={{ scale: asking ? 1.2 : 1, rotate: spins * 720 }}
+              transition={reduce ? FADE_ONLY : { ...SPRING, rotate: { duration: 1.3, ease: [0.3, 0.9, 0.3, 1] } }}
             >
               <Eye cx={CX - EYE_DX} shape={shape} gradId={gradId} reduce={reduce} />
               <Eye cx={CX + EYE_DX} shape={shape} gradId={gradId} reduce={reduce} />
             </motion.g>
           </g>
         </svg>
+        {sessions.length > 1 && (
+          <span className="orbi-dots" aria-hidden="true">
+            {sessions.slice(0, 4).map((st, i) => (
+              <i key={i} data-state={st} />
+            ))}
+          </span>
+        )}
         <AnimatePresence>
           {asking && behind > 0 && (
             <motion.span

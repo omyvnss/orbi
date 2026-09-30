@@ -25,7 +25,8 @@ Claude Code sessions, or open `/hooks`, to pick up the change.
   "args": ["-c", "[ -x \"$0\" ] && exec \"$0\" \"$@\"; exit 0",
            "/Applications/Orbi.app/Contents/MacOS/orbi-hook", "ask", "--agent", "claude-code"],
   "timeout": 120 } ] } ],
-"UserPromptSubmit" / "PreToolUse" (matcher "*") / "Notification" / "Stop" / "StopFailure":
+"UserPromptSubmit" / "PreToolUse" / "PostToolUse" / "PostToolUseFailure" (matcher "*") /
+"Notification" / "Stop" / "StopFailure" / "SessionStart" / "SessionEnd" / "SubagentStart" / "SubagentStop":
   same wrapper with ["event", "--agent", "claude-code"], "timeout": 5, "async": true
 ```
 
@@ -39,6 +40,25 @@ exits 0 silently.
 | `PreToolUse` | `POST /event` working | "running `npm test`", "editing `src/app.ts`", … |
 | `Notification` | `POST /event` working | the notification text |
 | `Stop` / `StopFailure` | `POST /event` done / error | "finished" / "stopped with an error" |
+| `SessionStart` / `SessionEnd` | `POST /event` with `phase` | the session appears / leaves the list; `SessionEnd` releases its pending prompts to the terminal |
+| `SubagentStart` / `SubagentStop` | `POST /event` with `phase` | "running a sub-agent: Explore" on that session |
+| `PreToolUse` for `AskUserQuestion` | `POST /event` with `question` | the question and its options; ⌃⌥J to answer in the terminal |
+
+## Questions (`AskUserQuestion`)
+
+Orbi shows Claude's multiple-choice questions but never answers them. A hook
+*can* answer one (PreToolUse `allow` + `updatedInput.answers`), but only by
+holding the question back until the hook returns — so anyone answering in the
+terminal would wait. Orbi's PreToolUse hook is async, so the terminal shows the
+question immediately, exactly as without Orbi.
+
+## Jump to the exact tab (⌃⌥J)
+
+orbi-hook sends `TERM_PROGRAM`, iTerm's `ITERM_SESSION_ID` and (for Apple's
+Terminal) the tty. Orbi checks each against a strict pattern and passes it to
+`osascript` as an argument, never inside script text. macOS asks once for
+Automation permission; if it's refused, or the tab is gone, ⌃⌥J opens the app
+as before.
 
 ## Why `PermissionRequest`, not `PreToolUse`
 

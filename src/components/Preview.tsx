@@ -1,7 +1,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useState, type ReactNode } from "react";
-import { openSettings, type OrbiRequest, type OrbiSnapshot } from "../lib/tauri.js";
-import type { OrbiState } from "../lib/faceState.js";
+import { openSettings, type OrbiRequest, type OrbiSession, type OrbiSnapshot } from "../lib/tauri.js";
+import { openQuestion, type OrbiState } from "../lib/faceState.js";
 import { useNow } from "../hooks/useOrbiState.js";
 import { SPRING, FADE_ONLY } from "../lib/motion.js";
 
@@ -151,6 +151,63 @@ function AskingBody({ snap, expanded }: { snap: OrbiSnapshot; expanded: boolean 
   );
 }
 
+/** Claude asked a multiple-choice question. Orbi shows it; the answer goes in
+ * the terminal (⌃⌥J jumps to the exact tab), so the terminal is never held up. */
+function QuestionBody({ s, expanded }: { s: OrbiSession; expanded: boolean }) {
+  const q = s.question!;
+  return (
+    <>
+      <div className="orbi-line">
+        <span className="orbi-text">
+          <strong className="orbi-agent">{s.agentLabel}</strong> asks <span className="orbi-muted">· {s.project}</span>
+        </span>
+        {expanded && <SettingsGear />}
+      </div>
+      <p className="orbi-question">{q.text}</p>
+      {q.options.length > 0 && (
+        <div className="orbi-options">
+          {q.options.map((o) => (
+            <span key={o} className="orbi-option">
+              {o}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="orbi-hints">
+        <Keys keys="⌃⌥J" label="Answer in terminal" />
+        {q.more > 0 && <span className="orbi-hint-end">+{q.more} more</span>}
+      </div>
+    </>
+  );
+}
+
+const STATE_WORD: Record<OrbiSession["state"], string> = {
+  ready: "ready",
+  working: "working",
+  asking: "needs you",
+  question: "has a question",
+  done: "done",
+  error: "error",
+};
+
+/** Every running session, when the card is open. */
+function SessionList({ sessions }: { sessions: OrbiSession[] }) {
+  return (
+    <ul className="orbi-sessions" aria-label="Running sessions">
+      {sessions.map((s) => (
+        <li key={s.key} className="orbi-session" data-state={s.state}>
+          <span className="orbi-session-dot" aria-hidden="true" />
+          <span className="orbi-session-name">{s.project}</span>
+          <span className="orbi-session-meta">
+            {s.agentLabel} · {s.summary ? <RichLine text={s.summary} /> : STATE_WORD[s.state]}
+            {s.subagents > 0 && <span className="orbi-session-sub"> · {s.subagents} sub-agent{s.subagents > 1 ? "s" : ""}</span>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ActivityBody({ snap, face, expanded }: { snap: OrbiSnapshot; face: OrbiState; expanded: boolean }) {
   const a = snap.activity!;
   return (
@@ -171,11 +228,12 @@ function ActivityBody({ snap, face, expanded }: { snap: OrbiSnapshot; face: Orbi
   );
 }
 
-type Mode = "paused" | "asking" | "activity" | "idle-hover" | null;
+type Mode = "paused" | "asking" | "question" | "activity" | "idle-hover" | null;
 
-function modeOf(snap: OrbiSnapshot | null, face: OrbiState, expanded: boolean): Mode {
+function modeOf(snap: OrbiSnapshot | null, face: OrbiState, expanded: boolean, now: number): Mode {
   if (snap?.paused) return "paused";
   if (face === "asking" && snap && snap.queue.length > 0) return "asking";
+  if (face === "asking" && openQuestion(snap, now)) return "question";
   if (face !== "idle" && snap?.activity) return "activity";
   return expanded ? "idle-hover" : null;
 }
@@ -191,7 +249,13 @@ export function Preview({
   expanded: boolean;
 }) {
   const reduce = useReducedMotion() ?? false;
-  const mode = modeOf(snapshot, face, expanded);
+  const now = useNow(true, 15_000);
+  const mode = modeOf(snapshot, face, expanded, now);
+  const question = mode === "question" ? openQuestion(snapshot, now) : null;
+  const sessions = snapshot?.sessions ?? [];
+  // The session list only when open, and only when it adds something: more
+  // than one session, or one the card isn't already about.
+  const showSessions = expanded && mode !== "paused" && sessions.length > (mode === "idle-hover" ? 0 : 1);
 
   return (
     <AnimatePresence initial={false}>
@@ -218,6 +282,7 @@ export function Preview({
             </div>
           )}
           {mode === "asking" && <AskingBody snap={snapshot!} expanded={expanded} />}
+          {mode === "question" && question && <QuestionBody s={question} expanded={expanded} />}
           {mode === "activity" && <ActivityBody snap={snapshot!} face={face} expanded={expanded} />}
           {mode === "idle-hover" && (
             <div className="orbi-line">
@@ -226,6 +291,7 @@ export function Preview({
               <SettingsGear />
             </div>
           )}
+          {showSessions && <SessionList sessions={sessions} />}
         </motion.div>
       )}
     </AnimatePresence>

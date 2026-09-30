@@ -66,6 +66,52 @@ fn app_bundle() -> Option<String> {
     std::env::var("__CFBundleIdentifier").ok().filter(|s| !s.is_empty())
 }
 
+/// Which terminal tab the agent runs in, so ⌃⌥J can bring back that exact
+/// tab: the terminal program, iTerm's session id, and (for Apple's Terminal)
+/// the tty. Orbi validates all of it again before using it.
+fn term_context() -> Option<Value> {
+    let program = std::env::var("TERM_PROGRAM").ok().filter(|s| !s.is_empty())?;
+    let mut t = serde_json::Map::new();
+    t.insert("program".into(), Value::String(program.clone()));
+    if let Ok(id) = std::env::var("ITERM_SESSION_ID") {
+        t.insert("iterm".into(), Value::String(id));
+    }
+    if program == "Apple_Terminal" {
+        if let Some(tty) = ancestor_tty() {
+            t.insert("tty".into(), Value::String(tty));
+        }
+    }
+    Some(Value::Object(t))
+}
+
+/// The first controlling terminal up the process tree (the hook's own stdin is
+/// a pipe). A few `ps` calls at most; any failure just means no tab jump.
+fn ancestor_tty() -> Option<String> {
+    let mut pid = std::os::unix::process::parent_id();
+    for _ in 0..4 {
+        let out = std::process::Command::new("/bin/ps").args(["-o", "ppid=,tty=", "-p", &pid.to_string()]).output().ok()?;
+        let line = String::from_utf8_lossy(&out.stdout).to_string();
+        let mut parts = line.split_whitespace();
+        let ppid = parts.next()?.parse::<u32>().ok()?;
+        let tty = parts.next().unwrap_or("");
+        if tty.starts_with("ttys") && tty[4..].bytes().all(|b| b.is_ascii_digit()) && tty.len() <= 9 {
+            return Some(format!("/dev/{tty}"));
+        }
+        if ppid <= 1 {
+            return None;
+        }
+        pid = ppid;
+    }
+    None
+}
+
+fn with_term(mut body: Value) -> Value {
+    if let Some(t) = term_context() {
+        body["term"] = t;
+    }
+    body
+}
+
 fn read_stdin() -> Option<Value> {
     let mut buf = Vec::new();
     std::io::stdin().take(16 << 20).read_to_end(&mut buf).ok()?;
@@ -136,7 +182,7 @@ fn cmd_ask(args: &[String]) -> i32 {
     let res = std::panic::catch_unwind(|| {
         let Some(hook) = read_stdin() else { return (String::new(), Decision::Ask) };
         let (body, event) = agents::ask_request(&agent, &hook, app_bundle().as_deref());
-        (event, ask_orbi(body))
+        (event, ask_orbi(with_term(body)))
     });
     let (event, d) = res.unwrap_or((String::new(), Decision::Ask));
     emit(&agents::ask_output(&agent, &event, d))
@@ -165,7 +211,7 @@ fn cmd_event(args: &[String]) {
         let agent = agent.unwrap_or_else(|| "claude-code".into());
         let Some(hook) = read_stdin() else { return };
         match agents::event_from(&agent, &hook, app_bundle().as_deref()) {
-            Some(b) => b,
+            Some(b) => with_term(b),
             None => return,
         }
     };

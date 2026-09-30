@@ -18,8 +18,20 @@ export interface PartAdjust {
 }
 
 export interface OrbiLayout {
-  /** Rendered face width in logical points. */
+  /** Widget window width in logical points (derived from size × length). */
   width: number;
+  /** Overall size of the face, 1 = default. Set in Settings → Appearance. */
+  size: number;
+  /** How wide the pill stretches sideways, 1 = default. */
+  length: number;
+  /** How far the pill hangs down below the camera, 1 = default. */
+  height: number;
+  /** Shrink back into the notch when no agent is doing anything. */
+  tuck: boolean;
+  /** Soft sounds when an agent needs you or finishes. */
+  sound: boolean;
+  /** 0..1 */
+  volume: number;
   /** Widget window position in logical points, or null for default top-centre. */
   x: number | null;
   y: number | null;
@@ -31,9 +43,29 @@ const NEUTRAL: PartAdjust = { dx: 0, dy: 0, s: 1 };
 /** Matches the Rust side's collapsed window width. */
 export const DEFAULT_WIDTH = 320;
 
+/** The face's drawing size in points (see OrbiFace). */
+export const FACE_W = 150;
+export const FACE_H = 40;
+
+export const SIZE_RANGE = { min: 0.75, max: 1.6 } as const;
+export const LENGTH_RANGE = { min: 0.7, max: 2 } as const;
+export const HEIGHT_RANGE = { min: 0.8, max: 2.5 } as const;
+
+/** Window width that fits a face of this size and length, plus room for the
+ * asking-state widening and the preview card. */
+export function windowWidth(size: number, length: number): number {
+  return Math.max(DEFAULT_WIDTH, Math.ceil((FACE_W * length + 16) * size + 40));
+}
+
 export function defaultLayout(): OrbiLayout {
   return {
     width: DEFAULT_WIDTH,
+    size: 1,
+    length: 1,
+    height: 1,
+    tuck: true,
+    sound: true,
+    volume: 0.5,
     x: null,
     y: null,
     parts: Object.fromEntries(PART_NAMES.map((p) => [p, { ...NEUTRAL }])) as Record<
@@ -53,7 +85,13 @@ export function parseLayout(raw: unknown): OrbiLayout {
   const num = (v: unknown, fallback: number, min: number, max: number) =>
     typeof v === "number" && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : fallback;
 
-  base.width = num(o.width, DEFAULT_WIDTH, 80, 600);
+  base.size = num(o.size, 1, SIZE_RANGE.min, SIZE_RANGE.max);
+  base.length = num(o.length, 1, LENGTH_RANGE.min, LENGTH_RANGE.max);
+  base.height = num(o.height, 1, HEIGHT_RANGE.min, HEIGHT_RANGE.max);
+  base.tuck = typeof o.tuck === "boolean" ? o.tuck : true;
+  base.sound = typeof o.sound === "boolean" ? o.sound : true;
+  base.volume = num(o.volume, 0.5, 0, 1);
+  base.width = windowWidth(base.size, base.length);
   base.x = typeof o.x === "number" && Number.isFinite(o.x) ? o.x : null;
   base.y = typeof o.y === "number" && Number.isFinite(o.y) ? o.y : null;
 

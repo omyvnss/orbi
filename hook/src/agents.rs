@@ -246,7 +246,27 @@ pub fn event_from(agent: &str, hook: &Value, app_bundle: Option<&str>) -> Option
         Family::Claude | Family::Codex => {
             let cwd = s(hook, "cwd");
             let session = s(hook, "session_id");
-            match ev {
+            // Lifecycle only: tracked as a session, never shown as activity.
+            let phase = |p: &str, summary: String| {
+                let mut b = event_body(agent, "session", &summary, None, session, app_bundle);
+                b["phase"] = json!(p);
+                Some(b)
+            };
+            let out = match ev {
+                "SessionStart" => phase("start", String::new()),
+                "SessionEnd" => phase("end", String::new()),
+                "SubagentStart" => phase("subagent_start", short(s(hook, "agent_type"), 40)),
+                "SubagentStop" => phase("subagent_stop", short(s(hook, "agent_type"), 40)),
+                "PreToolUse" if s(hook, "tool_name") == "AskUserQuestion" => {
+                    // Shown in Orbi; answered in the terminal (⌃⌥J jumps there).
+                    let q = question_of(hook.get("tool_input").unwrap_or(&empty));
+                    mk("working", "has a question for you".into(), None, session).map(|mut b| {
+                        if let Some(q) = q {
+                            b["question"] = q;
+                        }
+                        b
+                    })
+                }
                 "UserPromptSubmit" => settles(mk("working", thinking(), None, session)),
                 "PostToolUse" | "PostToolUseFailure" => {
                     let (tool, input) = normalize_tool(agent, s(hook, "tool_name"), hook.get("tool_input").unwrap_or(&empty), cwd);
@@ -271,7 +291,14 @@ pub fn event_from(agent: &str, hook: &Value, app_bundle: Option<&str>) -> Option
                 "Stop" => settles(mk("done", "finished".into(), Some(s(hook, "last_assistant_message").to_string()), session)),
                 "StopFailure" => settles(mk("error", "stopped with an error".into(), None, session)),
                 _ => None,
-            }
+            };
+            // The project folder names the session on the face.
+            out.map(|mut b| {
+                if !cwd.is_empty() {
+                    b["cwd"] = json!(cwd);
+                }
+                b
+            })
         }
         Family::Gemini => {
             let cwd = s(hook, "cwd");
@@ -372,6 +399,23 @@ pub fn event_from(agent: &str, hook: &Value, app_bundle: Option<&str>) -> Option
     }
 }
 
+/// The first question of an `AskUserQuestion` call: its text and up to four
+/// option labels. Everything is length-capped; Orbi only displays it.
+fn question_of(input: &Value) -> Option<Value> {
+    let q = input.get("questions").and_then(Value::as_array)?.first()?;
+    let text = short(s(q, "question"), 200);
+    if text.is_empty() {
+        return None;
+    }
+    let options: Vec<String> = q
+        .get("options")
+        .and_then(Value::as_array)
+        .map(|a| a.iter().take(4).map(|o| short(s(o, "label"), 40)).filter(|l| !l.is_empty()).collect())
+        .unwrap_or_default();
+    let more = input.get("questions").and_then(Value::as_array).map(|a| a.len().saturating_sub(1)).unwrap_or(0);
+    Some(json!({ "text": text, "options": options, "more": more }))
+}
+
 /// Codex CLI `notify` program: Codex appends one JSON argument.
 pub fn event_from_codex_notify(arg: &Value, app_bundle: Option<&str>) -> Option<Value> {
     match s(arg, "type") {
@@ -469,7 +513,7 @@ mod tests {
         let e = event_from("claude-code", &json!({"hook_event_name": "Stop", "last_assistant_message": "Done."}), None).unwrap();
         assert_eq!((e["kind"].as_str(), e["detail"].as_str()), (Some("done"), Some("Done.")));
         assert_eq!(event_from("claude-code", &json!({"hook_event_name": "StopFailure"}), None).unwrap()["kind"], "error");
-        assert!(event_from("claude-code", &json!({"hook_event_name": "SessionStart"}), None).is_none());
+        assert_eq!(event_from("claude-code", &json!({"hook_event_name": "SessionStart"}), None).unwrap()["phase"], "start");
         assert!(event_from("claude-code", &json!({"hook_event_name": "Notification"}), None).is_none());
         assert!(event_from("claude-code", &json!(null), None).is_none());
     }
@@ -624,5 +668,40 @@ mod tests {
         assert_eq!(word_output(Decision::Allow), Out { stdout: Some("allow".into()), code: 0 });
         assert_eq!(word_output(Decision::Deny), Out { stdout: Some("deny".into()), code: 1 });
         assert_eq!(word_output(Decision::Ask), Out { stdout: Some("ask".into()), code: 2 });
+    }
+
+    #[test]
+    fn claude_sessions_subagents_and_questions() {
+        let base = |ev: &str| json!({"hook_event_name": ev, "session_id": "s1", "cwd": "/w/orbi"});
+        let start = event_from("claude-code", &base("SessionStart"), None).unwrap();
+        assert_eq!((start["kind"].as_str(), start["phase"].as_str()), (Some("session"), Some("start")));
+        assert_eq!(start["cwd"], "/w/orbi");
+        assert_eq!(event_from("claude-code", &base("SessionEnd"), None).unwrap()["phase"], "end");
+
+        let mut sub = base("SubagentStart");
+        sub["agent_type"] = json!("Explore");
+        let sub = event_from("claude-code", &sub, None).unwrap();
+        assert_eq!((sub["phase"].as_str(), sub["summary"].as_str()), (Some("subagent_start"), Some("Explore")));
+
+        let mut ask = base("PreToolUse");
+        ask["tool_name"] = json!("AskUserQuestion");
+        ask["tool_input"] = json!({"questions": [
+            {"question": "Which database?", "header": "DB", "options": [{"label": "Postgres"}, {"label": "SQLite"}], "multiSelect": false},
+            {"question": "Second?", "options": []}
+        ]});
+        let q = event_from("claude-code", &ask, None).unwrap();
+        assert_eq!(q["kind"], "working");
+        assert_eq!(q["question"]["text"], "Which database?");
+        assert_eq!(q["question"]["options"], json!(["Postgres", "SQLite"]));
+        assert_eq!(q["question"]["more"], 1);
+
+        // A malformed question still reports activity, just without the card.
+        let mut bad = base("PreToolUse");
+        bad["tool_name"] = json!("AskUserQuestion");
+        bad["tool_input"] = json!({"questions": "nope"});
+        let b = event_from("claude-code", &bad, None).unwrap();
+        assert!(b.get("question").is_none());
+        // Ordinary events carry the working folder too.
+        assert_eq!(event_from("claude-code", &base("UserPromptSubmit"), None).unwrap()["cwd"], "/w/orbi");
     }
 }

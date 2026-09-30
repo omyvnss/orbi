@@ -247,7 +247,7 @@ pub fn open_settings_window(app: &AppHandle) {
 /// Commands that change what Orbi does are only accepted from the Settings
 /// window. The face renders agent-supplied text (commands, paths, model
 /// output), so it gets read-only access.
-fn from_settings(window: &tauri::WebviewWindow) -> Result<(), String> {
+pub(crate) fn from_settings(window: &tauri::WebviewWindow) -> Result<(), String> {
     if window.label() == SETTINGS_WINDOW {
         Ok(())
     } else {
@@ -387,6 +387,13 @@ pub fn connect_integration(
 ) -> Result<integrations::Integration, String> {
     from_settings(&window)?;
     integrations::connect(&id, &hook_path())
+}
+
+/// What Connect would change in the agent's config — shown before writing.
+#[tauri::command]
+pub fn preview_integration(window: tauri::WebviewWindow, id: String) -> Result<integrations::Preview, String> {
+    from_settings(&window)?;
+    integrations::preview(&id, &hook_path())
 }
 
 #[tauri::command]

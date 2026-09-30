@@ -60,8 +60,10 @@ function buildCases() {
     snap: OrbiSnapshot;
     expanded?: boolean;
     gaze?: { x: number; y: number };
+    tucked?: boolean;
   }> = [
     { title: "idle", face: "idle", snap: base, gaze: { x: -0.4, y: 0.1 } },
+    { title: "idle · tucked into the notch", face: "idle", snap: base, tucked: true },
     { title: "working", face: "working", snap: activity("working", "running `pnpm test`") },
     { title: "asking · queue of 3", face: "asking", snap: { ...base, queue: queue3 }, gaze: { x: 0, y: 0.85 } },
     { title: "done", face: "done", snap: activity("done", "finished · 14 files changed") },
@@ -76,6 +78,34 @@ function buildCases() {
       },
       expanded: true,
       gaze: { x: 0, y: 0.85 },
+    },
+    {
+      title: "question · answer in the terminal",
+      face: "asking",
+      snap: {
+        ...base,
+        sessions: [
+          {
+            key: "claude-code:s1", agent: "claude-code", agentLabel: "Claude Code", project: "orbi", state: "question",
+            summary: "has a question for you", subagents: 0, updatedAt: now,
+            question: { text: "Which database should the queue use?", options: ["Postgres", "SQLite", "Keep in memory"], more: 1 },
+          },
+        ],
+      },
+      gaze: { x: 0, y: 0.85 },
+    },
+    {
+      title: "3 sessions · expanded",
+      face: "working",
+      expanded: true,
+      snap: {
+        ...activity("working", "running `pnpm test`"),
+        sessions: [
+          { key: "a", agent: "claude-code", agentLabel: "Claude Code", project: "orbi", state: "working", summary: "running `pnpm test`", subagents: 2, question: null, updatedAt: now },
+          { key: "b", agent: "codex", agentLabel: "Codex", project: "web", state: "done", summary: "finished", subagents: 0, question: null, updatedAt: now - 60_000 },
+          { key: "c", agent: "opencode", agentLabel: "OpenCode", project: "api", state: "ready", summary: "", subagents: 0, question: null, updatedAt: now - 120_000 },
+        ],
+      },
     },
     {
       title: "asking · single, no risk",
@@ -101,6 +131,9 @@ export default function Demo() {
   useOrbiMood();
   // Built on mount so the mock timeouts are fresh on every load.
   const [CASES] = useState(buildCases);
+  // #demo?notch simulates a 14" MacBook's camera housing (185 × 32 pt) drawn
+  // over the tile, so you can see exactly what the notch hides.
+  const notch = window.location.hash.includes("notch") ? { w: 185, h: 32 } : null;
   return (
     <main className="demo">
       <header className="demo-head">
@@ -113,8 +146,16 @@ export default function Demo() {
             <div className="demo-screen">
               <div className="demo-menubar" />
               <div className="demo-window">
-                <OrbiView snapshot={c.snap} face={c.face} expanded={c.expanded ?? false} gaze={c.gaze ?? { x: 0, y: 0 }} />
+                <OrbiView
+                  snapshot={c.snap}
+                  face={c.face}
+                  expanded={c.expanded ?? false}
+                  gaze={c.gaze ?? { x: 0, y: 0 }}
+                  notch={notch}
+                  tucked={c.tucked ?? false}
+                />
               </div>
+              {notch && <div className="demo-notch" style={{ width: notch.w, height: notch.h }} />}
             </div>
             <figcaption>{c.title}</figcaption>
           </figure>

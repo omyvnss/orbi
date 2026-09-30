@@ -4,10 +4,40 @@ import {
   disconnectIntegration,
   errorText,
   listIntegrations,
+  previewIntegration,
   type AppInfo,
+  type ConnectPreview,
   type Integration,
 } from "../lib/tauri.js";
-import { Button, CopyButton, Icon, ICONS, PageHead } from "./ui.js";
+import { Button, Confirm, CopyButton, Icon, ICONS, PageHead } from "./ui.js";
+
+/** The exact lines Connect will add to the agent's config, before anything is written. */
+function DiffView({ preview }: { preview: ConnectPreview }) {
+  const added = preview.lines.filter((l) => l.op === "+").length;
+  const removed = preview.lines.filter((l) => l.op === "-").length;
+  return (
+    <div className="s-diff-wrap">
+      <p className="s-diff-lead">
+        {preview.creates ? "Orbi will create " : "Orbi will update "}
+        <code className="s-code-inline">{preview.configPath}</code>
+        {preview.creates ? "." : " and keep a backup of the original."} {added} line{added === 1 ? "" : "s"} added
+        {removed > 0 ? `, ${removed} replaced` : ""}. Everything else stays exactly as it is.
+      </p>
+      <pre className="s-diff" aria-label="Changes to the config file">
+        {preview.lines.map((l, i) => (
+          <span key={i} className="s-diff-line" data-op={l.op}>
+            <span className="s-diff-op" aria-hidden="true">
+              {l.op === "…" ? "⋯" : l.op}
+            </span>
+            {l.op === "…" ? "unchanged lines" : l.text || " "}
+            {"\n"}
+          </span>
+        ))}
+      </pre>
+      <p className="s-diff-foot">Values that look like keys or tokens are hidden here. Disconnect removes only Orbi's lines.</p>
+    </div>
+  );
+}
 
 /** Two-letter monogram; no third-party logos are bundled. */
 function monogram(name: string): string {
@@ -123,6 +153,7 @@ export function AgentsSection({ info }: { info: AppInfo | null }) {
   const [listError, setListError] = useState<string | null>(null);
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [review, setReview] = useState<{ it: Integration; preview: ConnectPreview } | null>(null);
 
   const refresh = useCallback(() => {
     listIntegrations().then(
@@ -141,16 +172,32 @@ export function AgentsSection({ info }: { info: AppInfo | null }) {
     return () => window.removeEventListener("focus", refresh);
   }, [refresh]);
 
-  const toggle = async (it: Integration) => {
+  const run = async (it: Integration, connect: boolean) => {
     setBusy((b) => ({ ...b, [it.id]: true }));
     setErrors(({ [it.id]: _, ...rest }) => rest);
     try {
-      const next = await (it.connected ? disconnectIntegration(it.id) : connectIntegration(it.id));
+      const next = await (connect ? connectIntegration(it.id) : disconnectIntegration(it.id));
       setList((l) => l?.map((x) => (x.id === next.id ? next : x)) ?? l);
     } catch (e) {
       setErrors((m) => ({ ...m, [it.id]: errorText(e) }));
     } finally {
       setBusy(({ [it.id]: _, ...rest }) => rest);
+    }
+  };
+
+  // Connect shows exactly what will change first; Disconnect only removes Orbi's lines.
+  const toggle = async (it: Integration) => {
+    if (it.connected) return run(it, false);
+    setBusy((b) => ({ ...b, [it.id]: true }));
+    setErrors(({ [it.id]: _, ...rest }) => rest);
+    try {
+      const preview = await previewIntegration(it.id);
+      setBusy(({ [it.id]: _, ...rest }) => rest);
+      if (preview.unchanged) return run(it, true);
+      setReview({ it, preview });
+    } catch (e) {
+      setBusy(({ [it.id]: _, ...rest }) => rest);
+      setErrors((m) => ({ ...m, [it.id]: errorText(e) }));
     }
   };
 
@@ -200,6 +247,22 @@ export function AgentsSection({ info }: { info: AppInfo | null }) {
       )}
 
       {info && <CustomCard hookPath={info.hookPath} />}
+
+      <Confirm
+        open={!!review}
+        wide
+        variant="primary"
+        title={review ? `Connect ${review.it.name}?` : ""}
+        body={review ? <DiffView preview={review.preview} /> : null}
+        confirmLabel="Connect"
+        busy={review ? !!busy[review.it.id] : false}
+        onCancel={() => setReview(null)}
+        onConfirm={() => {
+          if (!review) return;
+          const it = review.it;
+          void run(it, true).then(() => setReview(null));
+        }}
+      />
     </>
   );
 }

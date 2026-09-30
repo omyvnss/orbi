@@ -1,6 +1,6 @@
 [package]
 name = "orbi"
-version = "0.1.0"
+version = "0.2.0"
 description = "Orbi — a face for any AI agent"
 license = "MIT"
 edition = "2021"
@@ -29,8 +29,8 @@ ureq = { version = "2", default-features = false, features = ["tls"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSWindow", "NSResponder", "NSApplication", "NSWorkspace", "NSRunningApplication", "NSScreen", "libc"] }
-objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSWindow", "NSResponder", "NSApplication", "NSWorkspace", "NSRunningApplication", "NSScreen", "libc", "objc2-core-foundation"] }
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSProcessInfo", "NSString", "NSGeometry", "objc2-core-foundation"] }
 # Global cursor position for the gaze / click-through loop.
 objc2-core-graphics = "0.3.2"
 # BYOK API keys in the Keychain via SecItem, so a key never appears in argv.

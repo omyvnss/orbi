@@ -11,15 +11,17 @@ import {
 } from "../lib/tauri.js";
 import { Icon, ICONS } from "./ui.js";
 import { AgentsSection } from "./Agents.js";
+import { AppearanceSection } from "./Appearance.js";
 import { ExplainSection } from "./Explain.js";
 import { GeneralSection } from "./General.js";
 import { SecuritySection } from "./Security.js";
 import "./settings.css";
 
-export type SectionId = "agents" | "explain" | "general" | "security";
+export type SectionId = "agents" | "appearance" | "explain" | "general" | "security";
 
 const SECTIONS: { id: SectionId; label: string; icon: string }[] = [
   { id: "agents", label: "Agents", icon: ICONS.agents },
+  { id: "appearance", label: "Appearance", icon: ICONS.appearance },
   { id: "explain", label: "Explanations", icon: ICONS.explain },
   { id: "general", label: "General", icon: ICONS.general },
   { id: "security", label: "Security", icon: ICONS.security },
@@ -190,6 +192,7 @@ export default function Settings() {
         ) : (
           <div className="s-page" key={section}>
             {section === "agents" && <AgentsSection info={info} />}
+            {section === "appearance" && <AppearanceSection onError={setToast} />}
             {section === "explain" && <ExplainSection api={api} />}
             {section === "general" && <GeneralSection api={api} info={info} />}
             {section === "security" && <SecuritySection info={info} onError={setToast} />}

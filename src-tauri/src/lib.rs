@@ -189,6 +189,10 @@ fn place_widget(app: &AppHandle, w: f64, h: f64) {
         (Some(x), Some(y)) => {
             let Some(widget) = app.get_webview_window(WIDGET_WINDOW) else { return };
             let _ = widget.set_size(Size::Logical(LogicalSize::new(w, h)));
+            // A spot saved on a bigger display must not strand the face off-screen.
+            let (sw, sh) = screen_size_of(app);
+            let x = x.clamp(0.0, (sw - w).max(0.0));
+            let y = y.clamp(0.0, (sh - 60.0).max(0.0));
             let _ = widget.set_position(Position::Logical(LogicalPosition::new(x, y)));
         }
         _ => set_widget_size_centered(app, w, h),
@@ -394,6 +398,73 @@ fn exit_widget_edit_mode(app: AppHandle) {
     *app.state::<WidgetEditMode>().0.lock().unwrap() = false;
 }
 
+/// Logical size of the display the face lives on (primary as a fallback).
+fn screen_size_of(app: &AppHandle) -> (f64, f64) {
+    let monitor = app
+        .get_webview_window(WIDGET_WINDOW)
+        .and_then(|w| w.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten());
+    monitor
+        .map(|m| {
+            let s = m.size();
+            (s.width as f64 / m.scale_factor(), s.height as f64 / m.scale_factor())
+        })
+        .unwrap_or((1512.0, 982.0))
+}
+
+/// The camera housing on this Mac's built-in display, in points: its width and
+/// how far it reaches down. `None` on displays without one.
+#[derive(serde::Serialize, Clone, Copy, Debug)]
+struct Notch {
+    w: f64,
+    h: f64,
+}
+
+#[cfg(target_os = "macos")]
+fn notch_now() -> Option<Notch> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+    let mtm = MainThreadMarker::new()?;
+    for screen in NSScreen::screens(mtm).iter() {
+        let top = screen.safeAreaInsets().top;
+        if top <= 0.0 {
+            continue;
+        }
+        let frame = screen.frame();
+        let w = frame.size.width - screen.auxiliaryTopLeftArea().size.width - screen.auxiliaryTopRightArea().size.width;
+        if w > 0.0 {
+            return Some(Notch { w, h: top });
+        }
+    }
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn notch_now() -> Option<Notch> {
+    None
+}
+
+/// So the face can hang *below* the camera instead of hiding behind it.
+#[tauri::command]
+fn get_notch(app: AppHandle) -> Option<Notch> {
+    // AppKit wants the main thread; hop there if this command isn't on it.
+    if let Some(n) = notch_now() {
+        return Some(n);
+    }
+    let (tx, rx) = std::sync::mpsc::channel();
+    app.run_on_main_thread(move || {
+        let _ = tx.send(notch_now());
+    })
+    .ok()?;
+    rx.recv_timeout(std::time::Duration::from_millis(500)).ok().flatten()
+}
+
+/// For the Appearance page's drag-to-place map.
+#[tauri::command]
+fn get_screen_size(app: AppHandle) -> (f64, f64) {
+    screen_size_of(&app)
+}
+
 fn layout_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
@@ -403,11 +474,14 @@ fn layout_path(app: &AppHandle) -> Result<PathBuf, String> {
 /// Saves the layout verbatim. The schema lives in `src/lib/layout.ts`; Rust
 /// only reads back width and position.
 #[tauri::command]
-fn save_layout(app: AppHandle, layout: serde_json::Value) -> Result<(), String> {
+fn save_layout(app: AppHandle, window: tauri::WebviewWindow, layout: serde_json::Value) -> Result<(), String> {
+    settings::from_settings(&window)?;
     let path = layout_path(&app)?;
     let pretty = serde_json::to_string_pretty(&layout).map_err(|e| e.to_string())?;
     fs::write(path, pretty + "\n").map_err(|e| e.to_string())?;
     apply_saved_layout(&app);
+    // The face re-reads its size and length live.
+    let _ = app.emit_to(WIDGET_WINDOW, "layout-changed", layout);
     Ok(())
 }
 
@@ -419,7 +493,8 @@ fn load_layout(app: AppHandle) -> Option<serde_json::Value> {
 }
 
 #[tauri::command]
-fn reset_layout(app: AppHandle) -> Result<(), String> {
+fn reset_layout(app: AppHandle, window: tauri::WebviewWindow) -> Result<(), String> {
+    settings::from_settings(&window)?;
     let path = layout_path(&app)?;
     if path.exists() {
         fs::remove_file(path).map_err(|e| e.to_string())?;
@@ -430,6 +505,7 @@ fn reset_layout(app: AppHandle) -> Result<(), String> {
         }
     }
     position_widget(&app);
+    let _ = app.emit_to(WIDGET_WINDOW, "layout-changed", serde_json::Value::Null);
     Ok(())
 }
 
@@ -518,6 +594,8 @@ pub fn run() {
             save_layout,
             load_layout,
             reset_layout,
+            get_screen_size,
+            get_notch,
             enter_widget_edit_mode,
             exit_widget_edit_mode,
             fit_widget_height,
@@ -532,6 +610,7 @@ pub fn run() {
             settings::test_explain,
             settings::list_integrations,
             settings::connect_integration,
+            settings::preview_integration,
             settings::disconnect_integration,
             settings::regenerate_token,
             settings::get_app_info,
@@ -544,6 +623,9 @@ pub fn run() {
             // `Accessory` makes this process a permanent App Nap candidate.
             prevent_app_nap();
 
+            if cfg!(debug_assertions) {
+                eprintln!("[orbi] notch: {:?}", notch_now());
+            }
             apply_saved_layout(app.handle());
             spawn_gaze_loop(app.handle().clone());
             if let Some(widget) = app.get_webview_window(WIDGET_WINDOW) {

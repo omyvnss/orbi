@@ -45,12 +45,38 @@ export interface OrbiActivity {
   at: number;
 }
 
+/** A question the agent asked (Claude Code AskUserQuestion). Shown, never answered by Orbi. */
+export interface OrbiQuestion {
+  text: string;
+  options: string[];
+  /** Further questions after this one. */
+  more: number;
+}
+
+export type SessionState = "ready" | "working" | "asking" | "question" | "done" | "error";
+
+/** One running agent session, named after its project folder. */
+export interface OrbiSession {
+  key: string;
+  agent: string;
+  agentLabel: string;
+  project: string;
+  state: SessionState;
+  summary: string;
+  subagents: number;
+  question: OrbiQuestion | null;
+  /** ms since epoch */
+  updatedAt: number;
+}
+
 export interface OrbiSnapshot {
   paused: boolean;
   timeoutSecs: number;
   /** Oldest first; queue[0] is what ⌃⌥A / ⌃⌥D answer. */
   queue: OrbiRequest[];
   activity: OrbiActivity | null;
+  /** Newest first. */
+  sessions?: OrbiSession[];
 }
 
 /** Pull once on mount — events emitted before the listener attached are lost. */
@@ -107,6 +133,22 @@ export async function saveLayout(layout: unknown): Promise<void> {
 /** The saved layout, or null when nothing has been customised. */
 export async function loadLayout(): Promise<unknown | null> {
   return (await call<unknown | null>("load_layout")) ?? null;
+}
+
+/** Fires when Settings saves or resets the layout (null = reset). */
+export function onLayoutChanged(handler: (layout: unknown | null) => void): Promise<() => void> {
+  return on<unknown | null>("layout-changed", handler);
+}
+
+/** The camera housing on the built-in display, or null (external display, older Macs). */
+export async function getNotch(): Promise<{ w: number; h: number } | null> {
+  return (await call<{ w: number; h: number } | null>("get_notch")) ?? null;
+}
+
+/** Logical size of the display the face lives on. */
+export async function getScreenSize(): Promise<{ w: number; h: number } | null> {
+  const r = await call<[number, number]>("get_screen_size");
+  return r ? { w: r[0], h: r[1] } : null;
 }
 
 export async function resetLayout(): Promise<void> {
@@ -200,18 +242,18 @@ const mock = {
     { id: "claude-code", name: "Claude Code", detected: true, connected: true, approvals: true, status: true,
       configPath: "~/.claude/settings.json", note: "Approve and deny tool calls with ⌃⌥A / ⌃⌥D" },
     { id: "codex", name: "Codex", detected: true, connected: false, approvals: false, status: true,
-      configPath: "~/.codex/config.toml", note: "Status only — Codex has no approval hook" },
+      configPath: "~/.codex/hooks.json", note: "Run /hooks in Codex once to trust Orbi's hooks" },
     { id: "gemini", name: "Gemini CLI", detected: true, connected: false, approvals: true, status: true,
       configPath: "~/.gemini/settings.json", note: "BeforeTool hook answers approvals" },
     { id: "opencode", name: "OpenCode", detected: false, connected: false, approvals: true, status: true,
-      configPath: "~/.config/opencode/plugin/orbi.js", note: "Installs a small plugin file" },
+      configPath: "~/.config/opencode/plugins/orbi.js", note: "Installs a small plugin file" },
     { id: "cursor", name: "Cursor", detected: true, connected: true, approvals: true, status: true,
       configPath: "~/.cursor/hooks.json", note: "Agent shell and edit hooks" },
     { id: "hermes", name: "Hermes", detected: false, connected: false, approvals: false, status: true,
       configPath: "~/.hermes/config.yaml", note: "Status only — shows working and done" },
   ] as Integration[],
   info: {
-    version: "0.1.0",
+    version: "0.2.0",
     dataDir: "~/Library/Application Support/Orbi",
     hookPath: "/Applications/Orbi.app/Contents/MacOS/orbi-hook",
     port: 47821,
@@ -288,6 +330,43 @@ function mockToggle(id: string, connected: boolean): () => Promise<Integration> 
 
 export function connectIntegration(id: string): Promise<Integration> {
   return cmd("connect_integration", { id }, mockToggle(id, true));
+}
+
+export interface DiffLine {
+  /** "+", "-", " " (context) or "…" (unchanged lines skipped) */
+  op: string;
+  text: string;
+}
+
+/** What Connect would change in the agent's config. Nothing is written. */
+export interface ConnectPreview {
+  configPath: string;
+  unchanged: boolean;
+  creates: boolean;
+  lines: DiffLine[];
+}
+
+export function previewIntegration(id: string): Promise<ConnectPreview> {
+  return cmd("preview_integration", { id }, async () => {
+    await wait(250);
+    const it = mock.integrations.find((i) => i.id === id);
+    return {
+      configPath: it?.configPath ?? "~/.claude/settings.json",
+      unchanged: false,
+      creates: false,
+      lines: [
+        { op: "…", text: "" },
+        { op: " ", text: '  "model": "opus",' },
+        { op: "+", text: '  "hooks": {' },
+        { op: "+", text: '    "PermissionRequest": [' },
+        { op: "+", text: '      { "matcher": "*", "hooks": [ { "type": "command", "command": "/bin/sh", … } ] }' },
+        { op: "+", text: "    ]," },
+        { op: "+", text: '    "SessionStart": [ … ]' },
+        { op: "+", text: "  }" },
+        { op: " ", text: "}" },
+      ],
+    };
+  });
 }
 
 export function disconnectIntegration(id: string): Promise<Integration> {

@@ -27,7 +27,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..700&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap">
 <script>document.documentElement.classList.add("js");setTimeout(function(){document.documentElement.classList.add("rise-done")},2500)</script>
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -71,15 +71,15 @@
   <!-- the solar system: Orbi in the middle, your agents around it -->
   <div class="sol" aria-label="Agents Orbi works with">
     <div class="ring ring--1" style="--r:.25; --t:50s">
-      <span class="planet" style="--a:20deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/claude.svg" alt="" width="14" height="14"></b>Claude Code</span></span></span>
-      <span class="planet" style="--a:140deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/openai.svg" alt="" width="14" height="14"></b>Codex</span></span></span>
-      <span class="planet" style="--a:260deg"><span class="planet__spin"><span class="planet__b planet__b--a"><b><img src="assets/logos/opencode.svg" alt="" width="14" height="14"></b>OpenCode</span></span></span>
+      <span class="planet" style="--a:20deg"><span class="planet__spin"><span class="planet__b planet__b--a" title="Claude Code"><b><img src="assets/logos/claude.svg" alt="Claude Code" width="14" height="14"></b></span></span></span>
+      <span class="planet" style="--a:140deg"><span class="planet__spin"><span class="planet__b planet__b--a" title="Codex"><b><img src="assets/logos/openai.svg" alt="Codex" width="14" height="14"></b></span></span></span>
+      <span class="planet" style="--a:260deg"><span class="planet__spin"><span class="planet__b planet__b--a" title="OpenCode"><b><img src="assets/logos/opencode.svg" alt="OpenCode" width="14" height="14"></b></span></span></span>
     </div>
     <div class="ring ring--2" style="--r:.44; --t:90s">
-      <span class="planet" style="--a:60deg"><span class="planet__spin"><span class="planet__b"><b><img src="assets/logos/gemini.svg" alt="" width="14" height="14"></b>Gemini CLI</span></span></span>
-      <span class="planet" style="--a:150deg"><span class="planet__spin"><span class="planet__b"><b><img src="assets/logos/cursor.svg" alt="" width="14" height="14"></b>Cursor</span></span></span>
-      <span class="planet" style="--a:240deg"><span class="planet__spin"><span class="planet__b"><b class="is-photo"><img src="assets/logos/hermes.png" alt="" width="24" height="24"></b>Hermes</span></span></span>
-      <span class="planet" style="--a:330deg"><span class="planet__spin"><span class="planet__b"><b class="is-text">&gt;_</b>Any script</span></span></span>
+      <span class="planet" style="--a:60deg"><span class="planet__spin"><span class="planet__b" title="Gemini CLI"><b><img src="assets/logos/gemini.svg" alt="Gemini CLI" width="14" height="14"></b></span></span></span>
+      <span class="planet" style="--a:150deg"><span class="planet__spin"><span class="planet__b" title="Cursor"><b><img src="assets/logos/cursor.svg" alt="Cursor" width="14" height="14"></b></span></span></span>
+      <span class="planet" style="--a:240deg"><span class="planet__spin"><span class="planet__b" title="Hermes"><b class="is-photo"><img src="assets/logos/hermes.png" alt="Hermes" width="24" height="24"></b></span></span></span>
+      <span class="planet" style="--a:330deg"><span class="planet__spin"><span class="planet__b" title="Any script"><b class="is-text" role="img" aria-label="Any script">&gt;_</b></span></span></span>
     </div>
     <div class="sol__core">
       <span class="island island--core is-working" data-core><i class="eye"></i><i class="eye"></i><b class="orbit"></b></span>
@@ -318,8 +318,8 @@ sh install.sh</code></pre>
 </footer>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
-<script src="main.js?v=20" defer></script>
+<script src="main.js?v=22" defer></script>
 <!-- Dev-only feedback toolbar: does nothing unless served from localhost. -->
-<script type="module" src="agentation.js?v=20"></script>
+<script type="module" src="agentation.js?v=22"></script>
 </body>
 </html>
